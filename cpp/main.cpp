@@ -159,11 +159,33 @@ termios enable_raw_mode()
 
     return orig;
 }
+
+Game new_game() {
+    srand(time(0));
+
     // use separate terminal for the game
     enter_alternate_screen();
     hide_cursor();
     clear();
 
+    // load new game 
+    std::vector<std::string> words = get_word_list();
+    Game game = {
+        pick_random_words(words, 50), // word_list
+        200,                          // word_count
+        Difficulty::Easy,             // difficulty duh
+        30,                           // time - seconds
+    };
+
+    return game;
+}
+
+void draw(std::string str, Dimension d)
+{
+    clear();
+    move_cursor(d);
+    std::cout << std::fixed << std::setprecision(2);
+    std::cout << str;
 }
 
 double stopwatch(std::chrono::steady_clock::time_point start)
@@ -187,15 +209,6 @@ void game_over(const termios& terminal)
     exit_alternate_screen();
 }
 
-// TODO: render each frame:
-//   - hide cursor and clear the screen
-//   - draw the word block (max MAX_CHAR_PER_ROW chars per row)
-//   - highlight typed characters (green = correct, red = wrong)
-//   - cap the frame rate
-void draw()
-{
-    hide_cursor(); clear();
-}
 
 // TODO: initialize game state (score, terminal size, words)
 //       then run the draw/input loop.
@@ -206,26 +219,22 @@ void game()
 int main () {
     termios orig = enable_raw_mode();
 
+    Game game = new_game();
     Dimension term_size = get_term_size();
-
-    print_screen();
-
     auto start = std::chrono::steady_clock::now();
 
     while (true) {
-        char character = 0;
-        ssize_t n = read(STDIN_FILENO, &character, 1);
+        char ch = 0;
+        ssize_t n = read(STDIN_FILENO, &ch, 1);
 
         if(n > 0){
-            if (character == 'q') break;
+            if (ch == ctrl('c')) break;
         }
 
-        move_cursor(Dimension{1,1});
-        std::cout << std::fixed << std::setprecision(2);
-        std::cout << "Time: " << stopwatch(start) << " s" << std::flush;
+        draw("Time: " + std::to_string(stopwatch(start)), Dimension{1, 1});
 
         move_cursor(Dimension{1, term_size.col - 8});
-        std::cout << "Input: " << character << std::flush; // flush is important
+        std::cout << "Input: " << ch << std::flush; // flush is important
         std::this_thread::sleep_for(std::chrono::milliseconds(FPS));
     }
 
