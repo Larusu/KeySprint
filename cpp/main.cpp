@@ -145,8 +145,10 @@ void print_screen()
     std::cout << std::flush;
 }
 
-void initialize_game(const termios& orig) {
-    srand(time(0));
+termios enable_raw_mode()
+{
+    termios orig;
+    tcgetattr(STDIN_FILENO, &orig);
 
     // turn off canonical mode and echo
     termios copy = orig;
@@ -155,10 +157,13 @@ void initialize_game(const termios& orig) {
     copy.c_cc[VTIME] = 0;   // no timeout
     tcsetattr(STDIN_FILENO, TCSANOW, &copy);
 
+    return orig;
+}
     // use separate terminal for the game
     enter_alternate_screen();
     hide_cursor();
     clear();
+
 }
 
 double stopwatch(std::chrono::steady_clock::time_point start)
@@ -199,12 +204,10 @@ void game()
 }
 
 int main () {
-    termios orig_term;
-    tcgetattr(STDIN_FILENO, &orig_term);
+    termios orig = enable_raw_mode();
 
     Dimension term_size = get_term_size();
 
-    initialize_game(orig_term);
     print_screen();
 
     auto start = std::chrono::steady_clock::now();
@@ -225,6 +228,8 @@ int main () {
         std::cout << "Input: " << character << std::flush; // flush is important
         std::this_thread::sleep_for(std::chrono::milliseconds(FPS));
     }
-    game_over(orig_term);
+
+    game_over(orig);
+    std::cout << "Thank you for playing!";
     return 0;
 }
