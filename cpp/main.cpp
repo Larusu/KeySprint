@@ -1,14 +1,18 @@
 #include <cassert>
+#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #include <string>
 #include <sys/ioctl.h>
+#include <thread>
 #include <unistd.h>
 #include <termios.h>
 #include <vector>
 #include <ctime>
+#include <iomanip>
 
 #define MAX_CHAR_PER_ROW 50
+#define FPS              60
 
 struct Dimension{
     int row;
@@ -25,6 +29,7 @@ void clear()                   { std::cout << "\033[2J";                       }
 const char* green()            { return "\033[32m"; }
 const char* red()              { return "\033[31m"; }
 const char* reset()            { return "\033[0m";  }
+constexpr char ctrl(char c) { return c & 0x1F; }
 
 // Returns the terminal size
 Dimension get_term_size() // NOTE: terminal top-right starts at 1, 1
@@ -36,7 +41,7 @@ Dimension get_term_size() // NOTE: terminal top-right starts at 1, 1
     return {1, 1};
 }  
 
-std::vector<std::string> random_words(int count = 20)
+std::vector<std::string> random_words(size_t count = 20)
 {
     std::vector<std::string> words = {
         "Cat", "Dog", "Sun", "Map", "Bag", "Grab",
@@ -48,7 +53,8 @@ std::vector<std::string> random_words(int count = 20)
     std::vector<std::string> picked_words;
     for(size_t i = 0; i < count; i++)
     {
-        picked_words.push_back(words[rand() % words.size()]);
+        size_t rand_num = rand() % words.size();
+        picked_words.push_back(words[rand_num]);
     }
     return picked_words;
 }
@@ -110,17 +116,41 @@ void print_screen()
     std::cout << std::flush;
 }
 
+void initialize_game(const termios& orig) {
+    srand(time(0));
+
+    // turn off canonical mode and echo
+    termios copy = orig;
+    copy.c_lflag &= ~(ICANON | ECHO);
+    copy.c_cc[VMIN]  = 0;
+    copy.c_cc[VTIME] = 0;   // no timeout
+    tcsetattr(STDIN_FILENO, TCSANOW, &copy);
+
+    // use separate terminal for the game
+    enter_alternate_screen();
+    hide_cursor();
+    clear();
+}
+
+double stopwatch(std::chrono::steady_clock::time_point start)
+{
+    auto now = std::chrono::steady_clock::now();
+    return std::chrono::duration<double>(now - start).count();
+}
+
 // TODO: read input one keypress at a time (termios)
 void validate_input()
 {
     // check per character input
 }
 
-// TODO: restore the terminal, print the final score, and exit
-void game_over()
+// TODO: print the final score
+void game_over(const termios& terminal)
 {
-    show_cursor(); clear(); 
-    move_cursor(Dimension{1, 1});
+    show_cursor(); 
+    clear(); 
+    tcsetattr(STDIN_FILENO, TCSANOW, &terminal);
+    exit_alternate_screen();
 }
 
 // TODO: render each frame:
@@ -140,10 +170,32 @@ void game()
 }
 
 int main () {
-    srand(time(0));
-    enter_alternate_screen();
+    termios orig_term;
+    tcgetattr(STDIN_FILENO, &orig_term);
+
+    Dimension term_size = get_term_size();
+
+    initialize_game(orig_term);
     print_screen();
-    show_cursor();
-    // TODO: call exit_alternate_screen() once the game loop is in place
+
+    auto start = std::chrono::steady_clock::now();
+
+    while (true) {
+        char character = 0;
+        ssize_t n = read(STDIN_FILENO, &character, 1);
+
+        if(n > 0){
+            if (character == 'q') break;
+        }
+
+        move_cursor(Dimension{1,1});
+        std::cout << std::fixed << std::setprecision(2);
+        std::cout << "Time: " << stopwatch(start) << " s" << std::flush;
+
+        move_cursor(Dimension{1, term_size.col - 8});
+        std::cout << "Input: " << character << std::flush; // flush is important
+        std::this_thread::sleep_for(std::chrono::milliseconds(FPS));
+    }
+    game_over(orig_term);
     return 0;
 }
