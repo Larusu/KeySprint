@@ -14,9 +14,31 @@
 #define MAX_CHAR_PER_ROW 50
 #define FPS              60
 
-struct Dimension{
+enum class Difficulty { Easy, Medium, Hard };
+
+struct Dimension {
     int row;
     int col;
+};
+
+struct Game {
+    std::vector<std::string> word_list; // entire dictionary
+    int word_count;                     // max word count. no limit if time-based
+    Difficulty difficulty;              // 0 easy, 1 medium, 2 hard
+    uint8_t time;                       // seconds - max of 120 seconds
+};
+
+struct Stats {
+    int correct; 
+    int incorrect;
+    int extra;
+    int missed;
+};
+
+struct Player {
+    int attempts;
+    int best_WPM;
+    int best_accuracy;
 };
 
 // ANSI Escape helpers
