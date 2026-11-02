@@ -63,22 +63,29 @@ Dimension get_term_size() // NOTE: terminal top-right starts at 1, 1
     return {1, 1};
 }  
 
-std::vector<std::string> random_words(size_t count = 20)
+std::vector<std::string>get_word_list()
 {
-    std::vector<std::string> words = {
+    // TODO: change after json file is implemented
+    return {
         "Cat", "Dog", "Sun", "Map", "Bag", "Grab",
         "Animal", "Answer", "Camera", "Castle", "Garden", "Planet",
         "Absolute","Activity","Balanced","Campaign","Capacity","Concrete",
         "Constant", "Creative", "Database"
     };
+}
 
-    std::vector<std::string> picked_words;
-    for(size_t i = 0; i < count; i++)
-    {
-        size_t rand_num = rand() % words.size();
-        picked_words.push_back(words[rand_num]);
-    }
-    return picked_words;
+std::vector<std::string>pick_random_words(
+        const std::vector<std::string>word_list,
+        size_t word_count = 20
+){
+    std::vector<std::string> picked;
+    if(word_list.empty()) 
+        return picked;
+
+    picked.reserve(word_count);
+    for(size_t i = 0; i < word_count; i++)
+        picked.push_back(word_list[rand() % word_list.size()]);
+    return picked;
 }
 
 // Joins words into lines of at most MAX_CHAR_PER_ROW characters
@@ -119,7 +126,7 @@ std::vector<std::string> split_words(
 // TODO: fold into draw() once the game loop exists
 void print_screen()
 {
-    std::vector<std::string> random = random_words();
+    std::vector<std::string> random = pick_random_words(get_word_list(), 50);
     std::vector<std::string> split = split_words(random);
     Dimension d = get_term_size();
 
