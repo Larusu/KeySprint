@@ -12,7 +12,9 @@
 #include <iomanip>
 
 #define MAX_CHAR_PER_ROW 50
-#define FPS              60
+constexpr int FPS = 60;
+constexpr std::chrono::milliseconds FRAME_TIME(1000 / FPS);
+constexpr char ctrl(char c) { return c & 0x1F; }
 
 enum class Difficulty { Easy, Medium, Hard };
 
@@ -51,7 +53,6 @@ void clear()                   { std::cout << "\033[2J";                       }
 const char* green()            { return "\033[32m"; }
 const char* red()              { return "\033[31m"; }
 const char* reset()            { return "\033[0m";  }
-constexpr char ctrl(char c) { return c & 0x1F; }
 
 // Returns the terminal size
 Dimension get_term_size() // NOTE: terminal top-right starts at 1, 1
@@ -75,7 +76,7 @@ std::vector<std::string>get_word_list()
 }
 
 std::vector<std::string>pick_random_words(
-        const std::vector<std::string>word_list,
+        const std::vector<std::string>& word_list,
         size_t word_count = 20
 ){
     std::vector<std::string> picked;
@@ -223,6 +224,8 @@ int main () {
     Dimension term_size = get_term_size();
     auto start = std::chrono::steady_clock::now();
 
+    auto next_frame = std::chrono::steady_clock::now();
+
     while (true) {
         char ch = 0;
         ssize_t n = read(STDIN_FILENO, &ch, 1);
@@ -233,9 +236,10 @@ int main () {
 
         draw("Time: " + std::to_string(stopwatch(start)), Dimension{1, 1});
 
+        next_frame += FRAME_TIME;
         move_cursor(Dimension{1, term_size.col - 8});
         std::cout << "Input: " << ch << std::flush; // flush is important
-        std::this_thread::sleep_for(std::chrono::milliseconds(FPS));
+        std::this_thread::sleep_until(next_frame);
     }
 
     game_over(orig);
