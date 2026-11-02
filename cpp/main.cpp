@@ -121,7 +121,7 @@ void initialize_game(const termios& orig) {
 
     // turn off canonical mode and echo
     termios copy = orig;
-    copy.c_lflag &= ~(ICANON | ECHO);
+    copy.c_lflag &= ~(ICANON | ECHO | ISIG);
     copy.c_cc[VMIN]  = 0;
     copy.c_cc[VTIME] = 0;   // no timeout
     tcsetattr(STDIN_FILENO, TCSANOW, &copy);
