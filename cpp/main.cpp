@@ -136,11 +136,12 @@ Game new_game() {
 
     // load new game 
     std::vector<std::string> words = get_word_list();
+    int word_count = 50;
     Game game = {
-        pick_random_words(words, 50), // word_list
-        200,                          // word_count
-        Difficulty::Easy,             // difficulty duh
-        30,                           // time - seconds
+        pick_random_words(words, word_count), // word_list
+        word_count,                           // word_count
+        Difficulty::Easy,                     // difficulty duh
+        30,                                   // time - seconds
     };
 
     return game;
