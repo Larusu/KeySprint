@@ -98,27 +98,17 @@ std::vector<std::string> split_words(
     size_t char_count = 0;
     std::string new_word = "";
 
-    for(const std::string& word : picked_words)
-    {
-        size_t space = split_word.empty() ? 0 : 1;
-
-        if(word.length() + char_count + space > MAX_CHAR_PER_ROW)
-        {
+    for (const std::string& word : picked_words) {
+        size_t needed = new_word.empty() ? word.size()
+                                         : new_word.size() + 1 + word.size();
+        if (needed > MAX_CHAR_PER_ROW) {
             split_word.push_back(new_word);
-            char_count = 0;
-            new_word = "";
+            new_word.clear();
         }
-
-        if(!new_word.empty())
-            new_word += " ";
-
-        char_count += word.length() + space;
+        if (!new_word.empty()) new_word += ' ';
         new_word += word;
     }
-
-    if (!new_word.empty()) {
-        split_word.push_back(new_word);
-    }
+    if (!new_word.empty()) split_word.push_back(new_word);
 
     return split_word;
 }
