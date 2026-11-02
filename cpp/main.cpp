@@ -94,8 +94,6 @@ std::vector<std::string> split_words(
         const std::vector<std::string>& picked_words
 ){
     std::vector<std::string> split_word;
-
-    size_t char_count = 0;
     std::string new_word = "";
 
     for (const std::string& word : picked_words) {
@@ -111,29 +109,6 @@ std::vector<std::string> split_words(
     if (!new_word.empty()) split_word.push_back(new_word);
 
     return split_word;
-}
-
-// Temporary: renders the word block centered on screen
-// TODO: fold into draw() once the game loop exists
-void print_screen()
-{
-    std::vector<std::string> random = pick_random_words(get_word_list(), 50);
-    std::vector<std::string> split = split_words(random);
-    Dimension d = get_term_size();
-
-    int start_row = (d.row - split.size()) / 2;
-    int terminal_width = d.col;
-
-    d.row = (d.row - split.size()) / 2;
-    for(size_t i = 0; i < split.size(); i++)
-    {
-        d.col = (terminal_width - split[i].size()) / 2;
-        d.row = start_row + i;
-        move_cursor(d);
-        std::cout << split[i];
-    }
-
-    std::cout << std::flush;
 }
 
 termios enable_raw_mode()
@@ -173,10 +148,24 @@ Game new_game() {
 
 void draw(std::string str, Dimension d)
 {
-    clear();
     move_cursor(d);
     std::cout << std::fixed << std::setprecision(2);
-    std::cout << str;
+    std::cout << str << std::flush;
+}
+
+void print_word_block(const std::vector<std::string>& list, Dimension term_size)
+{
+    Dimension d;
+    std::vector<std::string> split = split_words(list);
+    int term_height = (term_size.row - split.size()) / 2;
+    int term_width  = term_size.col;
+
+    for(size_t i = 0; i < split.size(); i++)
+    {
+        d.col = (term_width - split[i].size()) / 2;
+        d.row = term_height + i;
+        draw(split[i], d);
+    }
 }
 
 double stopwatch(std::chrono::steady_clock::time_point start)
@@ -205,6 +194,7 @@ void game_over(const termios& terminal)
 //       then run the draw/input loop.
 void game()
 {
+
 }
 
 int main () {
@@ -215,6 +205,7 @@ int main () {
     auto start = std::chrono::steady_clock::now();
 
     auto next_frame = std::chrono::steady_clock::now();
+    char last_ch;
 
     while (true) {
         char ch = 0;
@@ -222,13 +213,17 @@ int main () {
 
         if(n > 0){
             if (ch == ctrl('c')) break;
+            last_ch = ch;
         }
 
+        clear();
+        print_word_block(game.word_list, term_size);
+
+
         draw("Time: " + std::to_string(stopwatch(start)), Dimension{1, 1});
+        draw(std::string("Input: ") + last_ch, Dimension{1, term_size.col - 8});
 
         next_frame += FRAME_TIME;
-        move_cursor(Dimension{1, term_size.col - 8});
-        std::cout << "Input: " << ch << std::flush; // flush is important
         std::this_thread::sleep_until(next_frame);
     }
 
