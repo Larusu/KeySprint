@@ -1,55 +1,47 @@
-#include <cassert>
-#include <chrono>
-#include <cstdlib>
-#include <iostream>
-#include <string>
-#include <sys/ioctl.h>
-#include <thread>
-#include <unistd.h>
-#include <termios.h>
-#include <vector>
-#include <ctime>
-#include <iomanip>
+#include "main.h"
 
-#define MAX_CHAR_PER_ROW 50
-constexpr int FPS = 60;
-constexpr std::chrono::milliseconds FRAME_TIME(1000 / FPS);
-constexpr char ctrl(char c) { return c & 0x1F; }
+int main () 
+{
+    srand(time(0));
+    termios orig = enable_raw_mode();
 
-enum class Difficulty { Easy, Medium, Hard };
+    Config config = { 
+        get_word_list(),  // dictionary
+        3,               // word count
+        Difficulty::Easy, // difficulty duh
+        30                // time limit
+    };
+    Game game = new_game(config);
 
-struct Dimension {
-    int row;
-    int col;
-};
+    bool is_running = true;
 
-struct Game {
-    std::vector<std::string> word_list; // entire dictionary
-    int word_count;                     // max word count. no limit if time-based
-    Difficulty difficulty;              // 0 easy, 1 medium, 2 hard
-    uint8_t time;                       // seconds - max of 120 seconds
-};
+    while (is_running)
+    {
+        char ch = 0;
+        ssize_t n = read(STDIN_FILENO, &ch, 1);
 
-struct Stats {
-    int correct; 
-    int incorrect;
-    int extra;
-    int missed;
-};
+        if(n > 0)
+        {
+            if (ch == ctrl('c'))
+                is_running = false; 
+            key_handler(game, ch);
+        }
 
-struct Player {
-    int attempts;
-    int best_WPM;
-    int best_accuracy;
-};
+        screen(game, config);
+    }
+
+    game_over(game, orig);
+    std::cout << "Thank you for playing!";
+    return 0;
+}
 
 // ANSI Escape helpers
 void move_cursor(Dimension d)  { std::cout << "\033["<<d.row<<";"<<d.col<<"H"; }
-void show_cursor()             { std::cout << "\033[?25h";                     }
-void hide_cursor()             { std::cout << "\033[?25l";                     }
-void enter_alternate_screen()  { std::cout << "\033[?1049h";                   }
-void exit_alternate_screen()   { std::cout << "\033[?1049l";                   }
-void clear()                   { std::cout << "\033[2J";                       }
+void show_cursor()             { std::cout << "\033[?25h";   }
+void hide_cursor()             { std::cout << "\033[?25l";   }
+void enter_alternate_screen()  { std::cout << "\033[?1049h"; }
+void exit_alternate_screen()   { std::cout << "\033[?1049l"; }
+void clear()                   { std::cout << "\033[2J";     }
 const char* green()            { return "\033[32m"; }
 const char* red()              { return "\033[31m"; }
 const char* reset()            { return "\033[0m";  }
@@ -75,17 +67,15 @@ std::vector<std::string>get_word_list()
     };
 }
 
-std::vector<std::string>pick_random_words(
-        const std::vector<std::string>& word_list,
-        size_t word_count = 20
-){
+std::vector<std::string>pick_random_words(const Config& c)
+{
     std::vector<std::string> picked;
-    if(word_list.empty()) 
+    if(c.word_list.empty()) 
         return picked;
 
-    picked.reserve(word_count);
-    for(size_t i = 0; i < word_count; i++)
-        picked.push_back(word_list[rand() % word_list.size()]);
+    picked.reserve(c.word_count);
+    for(size_t i = 0; i < c.word_count; i++)
+        picked.push_back(c.word_list[static_cast<size_t>(rand()) % c.word_list.size()]);
     return picked;
 }
 
@@ -123,66 +113,69 @@ termios enable_raw_mode()
     copy.c_cc[VTIME] = 0;   // no timeout
     tcsetattr(STDIN_FILENO, TCSANOW, &copy);
 
-    return orig;
-}
-
-Game new_game() {
-    srand(time(0));
-
     // use separate terminal for the game
     enter_alternate_screen();
     hide_cursor();
     clear();
 
-    // load new game 
-    std::vector<std::string> words = get_word_list();
-    int word_count = 50;
-    Game game = {
-        pick_random_words(words, word_count), // word_list
-        word_count,                           // word_count
-        Difficulty::Easy,                     // difficulty duh
-        30,                                   // time - seconds
-    };
-
-    return game;
+    return orig;
 }
 
-void draw(std::string str, Dimension d)
+Game new_game(const Config& config) 
+{
+    return Game {
+        pick_random_words(config),                   // words
+        std::vector<std::string>(config.word_count), // typed
+        0,                                           // cursor
+        {},
+        {}
+    };
+}
+
+template <typename... Args>
+void draw(Dimension d, Args&&... args)
 {
     move_cursor(d);
     std::cout << std::fixed << std::setprecision(2);
-    std::cout << str << std::flush;
+    (std::cout << ... << std::forward<Args>(args));
+    std::cout << std::flush;
 }
 
-void print_word_block(const std::vector<std::string>& list, Dimension term_size)
+void screen(const Game& g, const Config& c)
 {
-    Dimension d;
-    std::vector<std::string> split = split_words(list);
-    int term_height = (term_size.row - split.size()) / 2;
-    int term_width  = term_size.col;
+    clear();
+    auto next_frame = Clock::now();
+    Dimension size = get_term_size();
+    draw(Dimension{1, 1}, "Time: ", time_left(g, c));
+    if(g.typed.size() > g.cursor)
+        draw(Dimension{1, size.col / 2}, g.typed[g.cursor]);
 
-    for(size_t i = 0; i < split.size(); i++)
-    {
-        d.col = (term_width - split[i].size()) / 2;
-        d.row = term_height + i;
-        draw(split[i], d);
+    // WARNING: Temporary draw
+    std::string text;
+    for (size_t i = 0; i < g.words.size(); i++) {
+        if (!text.empty()) text += ' ';
+        text += g.words[i];
     }
+    draw(Dimension{size.row/2, size.col/2}, text);
+    draw(Dimension{3, 1}, "Correct = ", g.stats.correct);
+    draw(Dimension{4, 1}, "Incorrect = ", g.stats.incorrect);
+    draw(Dimension{5, 1}, "Missed = ", g.stats.missed);
+    draw(Dimension{6, 1}, "Extra = ", g.stats.extra);
+
+    next_frame += FRAME_TIME;
+    std::this_thread::sleep_until(next_frame);
 }
 
-double stopwatch(std::chrono::steady_clock::time_point start)
+double time_left(const Game& g, const Config& c)
 {
-    auto now = std::chrono::steady_clock::now();
-    return std::chrono::duration<double>(now - start).count();
-}
-
-// TODO: read input one keypress at a time (termios)
-void validate_input()
-{
-    // check per character input
+    if(!g.start)
+        return c.time_limit;
+    double elapsed = std::chrono::duration<double>(Clock::now() - *g.start).count();
+    return std::max(0.0, c.time_limit - elapsed);
 }
 
 // TODO: print the final score
-void game_over(const termios& terminal)
+void game_over(const Game& game, const termios& terminal)
 {
     show_cursor(); 
     clear(); 
@@ -190,45 +183,44 @@ void game_over(const termios& terminal)
     exit_alternate_screen();
 }
 
-
-// TODO: initialize game state (score, terminal size, words)
-//       then run the draw/input loop.
-void game()
+void key_handler(Game& g, char ch)
 {
+    // first correct character will start the timer, only if word_count > 0
+    if(!g.start && ch == g.words[0][0])
+        g.start = Clock::now();
 
-}
+    if (!g.start                        // ignore any key press
+        || ctrl('c') == ch              // ignore c input
+        || g.cursor >= g.words.size()   // ignore input after last word
+            ) return;
 
-int main () {
-    termios orig = enable_raw_mode();
+    std::string& typed = g.typed[g.cursor];
+    const std::string& target = g.words[g.cursor];
 
-    Game game = new_game();
-    Dimension term_size = get_term_size();
-    auto start = std::chrono::steady_clock::now();
-
-    auto next_frame = std::chrono::steady_clock::now();
-    char last_ch;
-
-    while (true) {
-        char ch = 0;
-        ssize_t n = read(STDIN_FILENO, &ch, 1);
-
-        if(n > 0){
-            if (ch == ctrl('c')) break;
-            last_ch = ch;
-        }
-
-        clear();
-        print_word_block(game.word_list, term_size);
-
-
-        draw("Time: " + std::to_string(stopwatch(start)), Dimension{1, 1});
-        draw(std::string("Input: ") + last_ch, Dimension{1, term_size.col - 8});
-
-        next_frame += FRAME_TIME;
-        std::this_thread::sleep_until(next_frame);
+    if(ch == ' ')
+    {
+        if(typed.size() < target.size())
+            g.stats.missed += target.size() - typed.size();
+        g.cursor++;
+        return;
+    }
+    else if(ch == 127 || ch == 8) // backspace
+    {
+        if(!typed.empty())
+            typed.pop_back(); 
+        else if(g.cursor > 0 && g.typed[g.cursor - 1] == g.words[g.cursor - 1])
+            return;
+        else
+            g.cursor--;
+        return;
     }
 
-    game_over(orig);
-    std::cout << "Thank you for playing!";
-    return 0;
+    if (typed.size() >= target.size())
+        g.stats.extra++;
+    else if (target[typed.size()] == ch)
+        g.stats.correct++;
+    else
+        g.stats.incorrect++;
+
+    typed += ch;
 }
