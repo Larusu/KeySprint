@@ -6,7 +6,7 @@ SOURCES  = main.cpp
 
 all: $(TARGET) run
 
-$(TARGET): $(SOURCES)
+$(TARGET): $(SOURCES) main.h
 	$(CXX) $(CXXFLAGS) $(SOURCES) -o $(TARGET) 
 
 run:
