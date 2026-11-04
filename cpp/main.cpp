@@ -213,10 +213,8 @@ void key_handler(Game& g, char ch)
     {
         if(!typed.empty())
             typed.pop_back(); 
-        else if(g.cursor > 0 && g.typed[g.cursor - 1] == g.words[g.cursor - 1])
-            return; // cannot backspace if the previous word is correct
-        else
-            g.cursor--; // go to previous word
+        else if(g.cursor > 0)
+            g.cursor--; // cannot backspace if the previous word is correct
         return;
     }
 
