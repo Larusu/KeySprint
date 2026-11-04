@@ -167,6 +167,9 @@ void screen(const Game& g, const Config& c)
     std::this_thread::sleep_until(next_frame);
 }
 
+bool is_over(const Game& g, const Config& c) 
+{ return g.cursor >= g.words.size() || time_left(g, c) <= 0.0; }
+
 double time_left(const Game& g, const Config& c)
 {
     if(!g.start)
