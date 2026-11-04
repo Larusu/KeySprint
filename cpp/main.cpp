@@ -1,4 +1,5 @@
 #include "main.h"
+#include <cctype>
 
 int main () 
 {
@@ -185,20 +186,21 @@ void game_over(const Game& game, const termios& terminal)
 
 void key_handler(Game& g, char ch)
 {
-    // first correct character will start the timer, only if word_count > 0
-    if(!g.start && ch == g.words[0][0])
+    // start the game
+    if(!g.start && ctrl(ch) != ch && (std::isalpha(ch) || std::isdigit(ch)))
         g.start = Clock::now();
 
-    if (!g.start                        // ignore any key press
-        || ctrl('c') == ch              // ignore c input
-        || g.cursor >= g.words.size()   // ignore input after last word
-            ) return;
+    // ignore any key press and input after last word
+    if (!g.start || g.cursor >= g.words.size()) 
+        return;
 
     std::string& typed = g.typed[g.cursor];
     const std::string& target = g.words[g.cursor];
 
     if(ch == ' ')
     {
+        if(typed.empty()) // prevent spam
+            return;
         if(typed.size() < target.size())
             g.stats.missed += target.size() - typed.size();
         g.cursor++;
@@ -209,9 +211,9 @@ void key_handler(Game& g, char ch)
         if(!typed.empty())
             typed.pop_back(); 
         else if(g.cursor > 0 && g.typed[g.cursor - 1] == g.words[g.cursor - 1])
-            return;
+            return; // cannot backspace if the previous word is correct
         else
-            g.cursor--;
+            g.cursor--; // go to previous word
         return;
     }
 
