@@ -45,6 +45,7 @@ void exit_alternate_screen()   { std::cout << "\033[?1049l"; }
 void clear()                   { std::cout << "\033[2J";     }
 const char* green()            { return "\033[32m"; }
 const char* red()              { return "\033[31m"; }
+const char* white()            { return "\033[37m"; }
 const char* reset()            { return "\033[0m";  }
 
 // Returns the terminal size
@@ -80,27 +81,61 @@ std::vector<std::string>pick_random_words(const Config& c)
     return picked;
 }
 
-// Joins words into lines of at most MAX_CHAR_PER_ROW characters
-std::vector<std::string> split_words(
-        const std::vector<std::string>& picked_words
-){
-    std::vector<std::string> split_word;
-    std::string new_word = "";
+// Joins colored words into lines of at most MAX_CHAR_PER_ROW characters
+std::vector<std::string> layout(const Game& game)
+{
+    std::vector<std::string> lines;
+    std::string line;
+    size_t line_width = 0;
 
-    for (const std::string& word : picked_words) {
-        size_t needed = new_word.empty() ? word.size()
-                                         : new_word.size() + 1 + word.size();
-        if (needed > MAX_CHAR_PER_ROW) {
-            split_word.push_back(new_word);
-            new_word.clear();
+    for(size_t i = 0; i < game.words.size(); i++)
+    {
+        const std::string& typed  = game.typed[i];
+        const std::string& target = game.words[i];
+
+        size_t needed = line_width == 0 ? target.size()
+                                        : line_width + 1 + target.size();
+        if (needed > MAX_CHAR_PER_ROW && !line.empty()) 
+        {
+            lines.push_back(line);
+            line.clear();
+            line_width = 0;
         }
-        if (!new_word.empty()) new_word += ' ';
-        new_word += word;
-    }
-    if (!new_word.empty()) split_word.push_back(new_word);
 
-    return split_word;
+        if (line_width > 0) { line += ' '; line_width++; }
+
+        int max_len = std::max(target.size(), typed.size());
+        for(size_t j = 0; j < max_len; j++)
+        {
+            const char* color;
+            char shown;
+            if(j >= target.size()) // extra char
+            { 
+                color = red();
+                shown = typed[j];
+            }
+            else if(j < typed.size())
+            {  // correct or incorrect
+                color = (target[j] == typed[j]) ? green() : red(); 
+                shown = target[j]; 
+            }
+            else
+            {  // skipped or not typed yet
+                color = (i < game.cursor) ? red() : white(); 
+                shown = target[j];
+            }
+
+            line += std::string(color) + shown + reset();
+        }
+        line_width += max_len;
+    }
+
+    if(!line.empty())
+        lines.push_back(line);
+
+    return lines;
 }
+
 
 termios enable_raw_mode()
 {
@@ -149,13 +184,13 @@ void screen(const Game& g, const Config& c)
     Position size = get_term_size();
     draw({1, 1}, "Time: ", time_left(g, c));
     if(g.typed.size() > g.cursor)
-        draw(Dimension{1, size.col / 2}, g.typed[g.cursor]);
+        draw({1, size.col / 2}, g.typed[g.cursor]);
 
-    // WARNING: Temporary draw
-    std::string text;
-    for (size_t i = 0; i < g.words.size(); i++) {
-        if (!text.empty()) text += ' ';
-        text += g.words[i];
+    std::vector<std::string> split = layout(g);
+    for (size_t i = 0; i < split.size(); i++) {
+        int col = (size.col - MAX_CHAR_PER_ROW) / 2;
+        int row = size.row / 2 - 2;
+        draw({row + int(i), col}, split[i]);
     }
 
     // WARNING: Temporary draw
@@ -220,10 +255,16 @@ void key_handler(Game& g, char ch)
     {
         if(!typed.empty())
             typed.pop_back(); 
+        else if(g.cursor > 0 && g.typed[g.cursor - 1] == g.words[g.cursor - 1])
+            return;
         else if(g.cursor > 0)
             g.cursor--; // cannot backspace if the previous word is correct
         return;
     }
+
+    // limit number of typed key
+    if(typed.size() > target.size() + MAX_EXTRA)
+        return;
 
     if (typed.size() >= target.size())
         g.stats.extra++;

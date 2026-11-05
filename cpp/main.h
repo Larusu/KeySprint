@@ -21,6 +21,7 @@ constexpr int FPS = 60;
 constexpr std::chrono::milliseconds FRAME_TIME(1000 / FPS);
 constexpr char ctrl(char c) { return c & 0x1F; }
 using Clock = std::chrono::steady_clock;
+constexpr size_t MAX_EXTRA = 5; // limit extra letter
 
 enum class Difficulty { Easy, Medium, Hard };
 
@@ -77,8 +78,7 @@ const char* reset();
 Position get_term_size();
 std::vector<std::string>get_word_list();
 std::vector<std::string>pick_random_words(const Config& c);
-std::vector<std::string> split_words(
-        const std::vector<std::string>& picked_words);
+std::vector<std::string> layout(const Game& game);
 termios enable_raw_mode();
 Game new_game(const Config& config);
 template <typename... Args>
