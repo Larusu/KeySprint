@@ -37,7 +37,7 @@ int main ()
 }
 
 // ANSI Escape helpers
-void move_cursor(Dimension d)  { std::cout << "\033["<<d.row<<";"<<d.col<<"H"; }
+void move_cursor(Position d)   { std::cout << "\033["<<d.row<<";"<<d.col<<"H"; }
 void show_cursor()             { std::cout << "\033[?25h";   }
 void hide_cursor()             { std::cout << "\033[?25l";   }
 void enter_alternate_screen()  { std::cout << "\033[?1049h"; }
@@ -48,7 +48,7 @@ const char* red()              { return "\033[31m"; }
 const char* reset()            { return "\033[0m";  }
 
 // Returns the terminal size
-Dimension get_term_size() // NOTE: terminal top-right starts at 1, 1
+Position get_term_size() // NOTE: terminal top-right starts at 1, 1
 {
     struct winsize w;
     if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)
@@ -134,7 +134,7 @@ Game new_game(const Config& config)
 }
 
 template <typename... Args>
-void draw(Dimension d, Args&&... args)
+void draw(Position d, Args&&... args)
 {
     move_cursor(d);
     std::cout << std::fixed << std::setprecision(2);
@@ -146,8 +146,8 @@ void screen(const Game& g, const Config& c)
 {
     clear();
     auto next_frame = Clock::now();
-    Dimension size = get_term_size();
-    draw(Dimension{1, 1}, "Time: ", time_left(g, c));
+    Position size = get_term_size();
+    draw({1, 1}, "Time: ", time_left(g, c));
     if(g.typed.size() > g.cursor)
         draw(Dimension{1, size.col / 2}, g.typed[g.cursor]);
 
@@ -157,11 +157,18 @@ void screen(const Game& g, const Config& c)
         if (!text.empty()) text += ' ';
         text += g.words[i];
     }
-    draw(Dimension{size.row/2, size.col/2}, text);
-    draw(Dimension{3, 1}, "Correct = ", g.stats.correct);
-    draw(Dimension{4, 1}, "Incorrect = ", g.stats.incorrect);
-    draw(Dimension{5, 1}, "Missed = ", g.stats.missed);
-    draw(Dimension{6, 1}, "Extra = ", g.stats.extra);
+
+    // WARNING: Temporary draw
+    // std::string text;
+    // for (size_t i = 0; i < g.words.size(); i++) {
+    //     if (!text.empty()) text += ' ';
+    //     text += g.words[i];
+    // }
+    // draw({size.row/2, size.col/2}, text);
+    draw({3, 1}, "Correct = ", g.stats.correct);
+    draw({4, 1}, "Incorrect = ", g.stats.incorrect);
+    draw({5, 1}, "Missed = ", g.stats.missed);
+    draw({6, 1}, "Extra = ", g.stats.extra);
 
     next_frame += FRAME_TIME;
     std::this_thread::sleep_until(next_frame);
