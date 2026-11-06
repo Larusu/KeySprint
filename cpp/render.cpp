@@ -9,6 +9,14 @@
 namespace {
 constexpr int MAX_CHAR_PER_ROW = 50;
 
+template <typename... Args>
+void draw(std::stringstream& output, Position d, Args&&... args)
+{
+    output << move_cursor(d);
+    output << std::fixed << std::setprecision(2);
+    (output << ... << std::forward<Args>(args));
+}
+
 std::string colorize_word(const std::string& target, const std::string& typed, bool already_passed)
 {
     std::string word;
@@ -36,6 +44,27 @@ std::string colorize_word(const std::string& target, const std::string& typed, b
         word += std::string(color) + shown + reset();
     }
     return word;
+}
+
+std::string repeat(const char* s, int n)
+{
+    std::string str;
+    for(int i = 0; i < n; i++)
+    {
+        str += s;
+    }
+    return str;
+}
+
+void draw_box(std::stringstream& frame, int row, int col, int width, int height)
+{
+    draw(frame, {row, col}, "╭", repeat("─", width - 2), "╮");
+    for(int r = 1; r < height - 1; r++)
+    {
+        draw(frame, {row + r, col},             "│");
+        draw(frame, {row + r, col + width - 1}, "│");
+    }
+    draw(frame, {row + height - 1, col}, "╰", repeat("─", width - 2), "╯");
 }
 
 // Joins colored words into lines of at most MAX_CHAR_PER_ROW characters
@@ -71,14 +100,6 @@ std::vector<std::string> layout(const Game& game)
         lines.push_back(line);
 
     return lines;
-}
-
-template <typename... Args>
-void draw(std::stringstream& output, Position d, Args&&... args)
-{
-    output << move_cursor(d);
-    output << std::fixed << std::setprecision(2);
-    (output << ... << std::forward<Args>(args));
 }
 
 void draw_centered(std::stringstream& frame, int row, int center_col, std::string_view text)
@@ -128,6 +149,8 @@ void render(const Game& g, const Config& c, const State& s, const Result& r)
     clear_screen();
     const Position size = get_term_size();
     std::stringstream frame;
+
+    draw_box(frame, 5, 10, 40, 8);
 
     switch (s)
     {
