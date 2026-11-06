@@ -1,12 +1,14 @@
 .SILENT:
 CXX      = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra 
+CXXFLAGS = -std=c++17 -Wall -Wextra -Wmissing-declarations
 TARGET   = keysprint
-SOURCES  = main.cpp
+SOURCES  = main.cpp terminal.cpp game.cpp scoring.cpp render.cpp
+HEADERS  = game.h terminal.h scoring.h render.h
 
 all: $(TARGET) run
 
-$(TARGET): $(SOURCES) main.h
+.PHONY: all run clean
+$(TARGET): $(SOURCES) $(HEADERS)
 	$(CXX) $(CXXFLAGS) $(SOURCES) -o $(TARGET) 
 
 run:
