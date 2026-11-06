@@ -7,7 +7,7 @@ int main ()
     srand(time(0));
     termios orig = enable_raw_mode();
 
-    Config config = { get_word_list(), 20, Difficulty::Easy, 30 };
+    Config config = { get_word_list(), 5, Difficulty::Easy, 10 };
     Game game = new_game(config);
     State state = State::Playing;
 
@@ -31,7 +31,14 @@ const char* green()            { return "\033[32m"; }
 const char* red()              { return "\033[31m"; }
 const char* white()            { return "\033[37m"; }
 const char* reset()            { return "\033[0m";  }
-int calculateWPM() { return }
+
+bool is_over(const Game& g, const Config& c) 
+{
+    size_t last = g.words.size() - 1;
+    return g.cursor >= g.words.size() // passed the last word
+        || (g.cursor == last && g.typed[last] == g.words[last]) // correct + last word
+        || time_left(g, c) <= 0.0; // out of time dnkeew eht
+}
 
 // Returns the terminal size
 Position get_term_size() // NOTE: terminal top-right starts at 1, 1
@@ -193,9 +200,6 @@ void render(const Game& g, const Config& c, const State& state)
     std::cout << frame.str() << std::flush;
 
 }
-
-bool is_over(const Game& g, const Config& c) 
-{ return g.cursor >= g.words.size() || time_left(g, c) <= 0.0; }
 
 double time_left(const Game& g, const Config& c)
 {
