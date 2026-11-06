@@ -66,7 +66,7 @@ struct Player {             // persisted profile
 };
 
 // ANSI Escape helpers
-void move_cursor(Position d);
+std::string move_cursor(Position d);
 void show_cursor();
 void hide_cursor();
 void enter_alternate_screen();
@@ -82,7 +82,7 @@ std::vector<std::string> layout(const Game& game);
 termios enable_raw_mode();
 Game new_game(const Config& config);
 template <typename... Args>
-void draw(Position d, Args&&... args);
+void draw(std::stringstream& frame, Position d, Args&&... args);
 void screen(const Game& g, const Config& c);
 double time_left(const Game& g, const Config& c);
 void game_over(const Game& game, const termios& terminal);

@@ -1,5 +1,6 @@
 #include "main.h"
 #include <cctype>
+#include <sstream>
 
 int main () 
 {
@@ -8,7 +9,7 @@ int main ()
 
     Config config = { 
         get_word_list(),  // dictionary
-        3,               // word count
+        20,               // word count
         Difficulty::Easy, // difficulty duh
         30                // time limit
     };
@@ -37,7 +38,8 @@ int main ()
 }
 
 // ANSI Escape helpers
-void move_cursor(Position d)   { std::cout << "\033["<<d.row<<";"<<d.col<<"H"; }
+std::string move_cursor(Position d)
+{ return "\033[" + std::to_string(d.row) + ";" + std::to_string(d.col) + "H"; }
 void show_cursor()             { std::cout << "\033[?25h";   }
 void hide_cursor()             { std::cout << "\033[?25l";   }
 void enter_alternate_screen()  { std::cout << "\033[?1049h"; }
@@ -136,7 +138,6 @@ std::vector<std::string> layout(const Game& game)
     return lines;
 }
 
-
 termios enable_raw_mode()
 {
     termios orig;
@@ -169,12 +170,11 @@ Game new_game(const Config& config)
 }
 
 template <typename... Args>
-void draw(Position d, Args&&... args)
+void draw(std::stringstream& output, Position d, Args&&... args)
 {
-    move_cursor(d);
-    std::cout << std::fixed << std::setprecision(2);
-    (std::cout << ... << std::forward<Args>(args));
-    std::cout << std::flush;
+    output << move_cursor(d);
+    output << std::fixed << std::setprecision(2);
+    (output << ... << std::forward<Args>(args));
 }
 
 void screen(const Game& g, const Config& c)
@@ -182,28 +182,26 @@ void screen(const Game& g, const Config& c)
     clear();
     auto next_frame = Clock::now();
     Position size = get_term_size();
-    draw({1, 1}, "Time: ", time_left(g, c));
+    std::stringstream frame;
+
+    draw(frame, {1, 1}, "Time: ", time_left(g, c));
     if(g.typed.size() > g.cursor)
-        draw({1, size.col / 2}, g.typed[g.cursor]);
+        draw(frame, {1, size.col / 2}, g.typed[g.cursor]);
 
     std::vector<std::string> split = layout(g);
     for (size_t i = 0; i < split.size(); i++) {
         int col = (size.col - MAX_CHAR_PER_ROW) / 2;
         int row = size.row / 2 - 2;
-        draw({row + int(i), col}, split[i]);
+        draw(frame, {row + int(i), col}, split[i]);
     }
 
     // WARNING: Temporary draw
-    // std::string text;
-    // for (size_t i = 0; i < g.words.size(); i++) {
-    //     if (!text.empty()) text += ' ';
-    //     text += g.words[i];
-    // }
-    // draw({size.row/2, size.col/2}, text);
-    draw({3, 1}, "Correct = ", g.stats.correct);
-    draw({4, 1}, "Incorrect = ", g.stats.incorrect);
-    draw({5, 1}, "Missed = ", g.stats.missed);
-    draw({6, 1}, "Extra = ", g.stats.extra);
+    draw(frame, {3, 1}, "Correct = ",   g.stats.correct);
+    draw(frame, {4, 1}, "Incorrect = ", g.stats.incorrect);
+    draw(frame, {5, 1}, "Missed = ",    g.stats.missed);
+    draw(frame, {6, 1}, "Extra = ",     g.stats.extra);
+
+    std::cout << frame.str() << std::flush;
 
     next_frame += FRAME_TIME;
     std::this_thread::sleep_until(next_frame);
