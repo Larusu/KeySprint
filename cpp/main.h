@@ -6,6 +6,7 @@
 #include <iostream>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <sys/ioctl.h>
 #include <thread>
 #include <unistd.h>
@@ -15,6 +16,7 @@
 #include <iomanip>
 #include <utility>
 #include <algorithm>
+#include <sstream>
 
 #define MAX_CHAR_PER_ROW 50
 constexpr int FPS = 60;
@@ -24,7 +26,18 @@ using Clock = std::chrono::steady_clock;
 constexpr size_t MAX_EXTRA = 5; // limit extra letter
 
 enum class Difficulty { Easy, Medium, Hard };
-enum class State      { Playing, Results, Exit };
+enum class State      { Playing, Results, Config, Exit };
+
+constexpr std::string_view to_string(Difficulty d)
+{
+    switch(d)
+    {
+        case Difficulty::Easy:   return "Easy";
+        case Difficulty::Medium: return "Medium";
+        case Difficulty::Hard:   return "Hard";
+        default:                 return "Unknown";
+    }
+}
 
 struct Position {
     int row;
@@ -84,8 +97,9 @@ termios enable_raw_mode();
 Game new_game(const Config& config);
 template <typename... Args>
 void draw(std::stringstream& frame, Position d, Args&&... args);
-void render(const Game& g, const Config& c, const State& state);
+void render(const Game& g, const Config& c, const State& state, const Result& result);
 double time_left(const Game& g, const Config& c);
 void game_over(const Game& game, const termios& terminal);
 void key_handler(Game& g, char input);
-void run(const Config& config, Game& game, State& state);
+void run(const Config& config, Game& game, State& state, Result& result);
+Result make_result(const Game& game, const Config& config);

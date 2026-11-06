@@ -1,5 +1,7 @@
 #include "main.h"
 #include <cctype>
+#include <ctime>
+#include <iomanip>
 #include <sstream>
 
 int main () 
@@ -10,9 +12,10 @@ int main ()
     Config config = { get_word_list(), 5, Difficulty::Easy, 10 };
     Game game = new_game(config);
     State state = State::Playing;
+    Result result = {};
 
     while(state != State::Exit)
-    { run(config, game, state); }
+    { run(config, game, state, result); }
 
     game_over(game, orig);
     std::cout << "Thank you for playing!";
@@ -40,6 +43,38 @@ bool is_over(const Game& g, const Config& c)
         || time_left(g, c) <= 0.0; // out of time dnkeew eht
 }
 
+double time_left(const Game& g, const Config& c)
+{
+    if(!g.start)
+        return c.time_limit;
+    double elapsed = std::chrono::duration<double>(Clock::now() - *g.start).count();
+    return std::max(0.0, c.time_limit - elapsed);
+}
+
+Stats compute_stats(const Game& game)
+{
+    Stats s{};
+
+    for(size_t i = 0; i < game.words.size(); i++)
+    {
+        const std::string& target = game.words[i];
+        const std::string& typed  = game.typed[i];
+
+        for(size_t j = 0; j < typed.size(); j++)
+        {
+            if (j >= target.size())
+                s.extra++;
+            else if (target[j] == typed[j])
+                s.correct++;
+            else
+                s.incorrect++;
+        }
+        if(i < game.cursor && typed.size() < target.size())
+            s.missed += target.size() - typed.size();
+    }
+    return s;
+}
+
 // Returns the terminal size
 Position get_term_size() // NOTE: terminal top-right starts at 1, 1
 {
@@ -49,6 +84,15 @@ Position get_term_size() // NOTE: terminal top-right starts at 1, 1
     std::cerr << "ERROR: Cannot get terminal size. \n";
     return {1, 1};
 }  
+
+// TODO: print the final score
+void game_over(const Game& game, const termios& terminal)
+{
+    show_cursor(); 
+    clear(); 
+    tcsetattr(STDIN_FILENO, TCSANOW, &terminal);
+    exit_alternate_screen();
+}
 
 std::vector<std::string>get_word_list()
 {
@@ -96,7 +140,7 @@ std::vector<std::string> layout(const Game& game)
 
         if (line_width > 0) { line += ' '; line_width++; }
 
-        int max_len = std::max(target.size(), typed.size());
+        size_t max_len = std::max(target.size(), typed.size());
         for(size_t j = 0; j < max_len; j++)
         {
             const char* color;
@@ -159,6 +203,51 @@ Game new_game(const Config& config)
     };
 }
 
+Result make_result(const Game& game, const Config& config)
+{
+    if(!is_over(game, config))
+        return {};
+
+    Result result{};
+    Stats totals = compute_stats(game);
+
+    // calculate duration
+    double duration = 0.0;
+    if(game.start)
+    {
+        double lap = std::chrono::duration<double>(Clock::now() - *game.start).count();
+        duration = std::min(lap, static_cast<double>(config.time_limit));
+    }
+    result.duration = duration;
+
+    // calculate accuracy
+    int overall = game.stats.correct + game.stats.incorrect + game.stats.extra;
+    result.accuracy = overall != 0 ? double(game.stats.correct) / overall * 100
+                                   : 0.0;
+
+    // calculate WPM
+    constexpr double CHARS_PER_WORD   = 5.0;
+    constexpr double SECONDS_PER_MIN  = 60.0;
+    double wpm = 0.0;
+    if(duration != 0.0)
+        wpm = (double(totals.correct) / CHARS_PER_WORD) / (duration / SECONDS_PER_MIN);
+    result.wpm = wpm;
+
+    // difficulty
+    result.difficulty = config.difficulty;
+
+    // date and time 
+    auto now = std::chrono::system_clock::now();
+    std::time_t current_time = std::chrono::system_clock::to_time_t(now);
+    std::tm local_time;
+    std::ostringstream oss;
+    localtime_r(&current_time, &local_time);
+    oss << std::put_time(&local_time, "%Y-%m-%dT%H:%M:%S");
+    result.date = oss.str();
+
+    return result;
+}
+
 template <typename... Args>
 void draw(std::stringstream& output, Position d, Args&&... args)
 {
@@ -167,7 +256,7 @@ void draw(std::stringstream& output, Position d, Args&&... args)
     (output << ... << std::forward<Args>(args));
 }
 
-void render(const Game& g, const Config& c, const State& state)
+void render(const Game& g, const Config& c, const State& state, const Result& result)
 {
     clear();
     
@@ -189,33 +278,17 @@ void render(const Game& g, const Config& c, const State& state)
     }
     else if(state == State::Results)
     {
+        Stats final = compute_stats(g);
         // WARNING: Temporary draw
         draw(frame, {size.row / 2 - 2, size.col / 2 - 6}, "Round over!");
-        draw(frame, {size.row / 2,     size.col / 2 - 8}, "Correct = ",   g.stats.correct);
-        draw(frame, {size.row / 2 + 1, size.col / 2 - 8}, "Incorrect = ", g.stats.incorrect);
-        draw(frame, {size.row / 2 + 2, size.col / 2 - 8}, "Missed = ",    g.stats.missed);
-        draw(frame, {size.row / 2 + 3, size.col / 2 - 8}, "Extra = ",     g.stats.extra);
+        draw(frame, {size.row / 2,     size.col / 2 - 8}, "WPM = ",        result.wpm);
+        draw(frame, {size.row / 2 + 1, size.col / 2 - 8}, "Accuracy = ",   result.accuracy);
+        draw(frame, {size.row / 2 + 2, size.col / 2 - 8}, "Duration = ",   result.duration);
+        draw(frame, {size.row / 2 + 3, size.col / 2 - 8}, "Difficulty = ", to_string(result.difficulty));
+        draw(frame, {size.row / 2 + 4, size.col / 2 - 8}, "Time = ", result.date);
     }
 
     std::cout << frame.str() << std::flush;
-
-}
-
-double time_left(const Game& g, const Config& c)
-{
-    if(!g.start)
-        return c.time_limit;
-    double elapsed = std::chrono::duration<double>(Clock::now() - *g.start).count();
-    return std::max(0.0, c.time_limit - elapsed);
-}
-
-// TODO: print the final score
-void game_over(const Game& game, const termios& terminal)
-{
-    show_cursor(); 
-    clear(); 
-    tcsetattr(STDIN_FILENO, TCSANOW, &terminal);
-    exit_alternate_screen();
 }
 
 void key_handler(Game& g, char ch)
@@ -251,7 +324,7 @@ void key_handler(Game& g, char ch)
     }
 
     // limit number of typed key
-    if(typed.size() > target.size() + MAX_EXTRA)
+    if(typed.size() >= target.size() + MAX_EXTRA)
         return;
 
     if (typed.size() >= target.size())
@@ -264,29 +337,43 @@ void key_handler(Game& g, char ch)
     typed += ch;
 }
 
-void run(const Config& config, Game& game, State& state)
+void run(const Config& config, Game& game, State& state, Result& result)
 {
     auto next_frame = Clock::now();
 
-    // 1. input: drain everything typed since the last frame
     char ch;
     while (read(STDIN_FILENO, &ch, 1) > 0)
     {
-        if (ch == ctrl('c')) { state = State::Exit; return; }
+        if (ch == ctrl('c')) 
+        { // exit game
+            state = State::Exit; 
+            return;
+        }
+        else if(ch == ctrl('n') && state != State::Playing) 
+        { // play again
+            state = State::Playing; 
+            game = new_game(config); 
+        }
+        else if(ch == ctrl('f') && state != State::Config)
+        { // change config
+            state = State::Config;
+        }
         
         if(state == State::Playing)
         {
             if (!game.start && std::isalnum(static_cast<unsigned char>(ch)))
                 game.start = Clock::now();
+            key_handler(game, ch);
         }
-
-        key_handler(game, ch);
     }
     
     if(state == State::Playing && is_over(game, config)) 
+    {
+        result = make_result(game, config);
         state = State::Results;
+    }
     
-    render(game, config, state);
+    render(game, config, state, result);
 
     next_frame += FRAME_TIME;
     std::this_thread::sleep_until(next_frame);
