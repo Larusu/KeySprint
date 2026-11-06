@@ -24,6 +24,7 @@ using Clock = std::chrono::steady_clock;
 constexpr size_t MAX_EXTRA = 5; // limit extra letter
 
 enum class Difficulty { Easy, Medium, Hard };
+enum class State      { Playing, Results, Exit };
 
 struct Position {
     int row;
@@ -83,7 +84,8 @@ termios enable_raw_mode();
 Game new_game(const Config& config);
 template <typename... Args>
 void draw(std::stringstream& frame, Position d, Args&&... args);
-void screen(const Game& g, const Config& c);
+void render(const Game& g, const Config& c, const State& state);
 double time_left(const Game& g, const Config& c);
 void game_over(const Game& game, const termios& terminal);
 void key_handler(Game& g, char input);
+void run(const Config& config, Game& game, State& state);

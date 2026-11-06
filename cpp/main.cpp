@@ -7,30 +7,12 @@ int main ()
     srand(time(0));
     termios orig = enable_raw_mode();
 
-    Config config = { 
-        get_word_list(),  // dictionary
-        20,               // word count
-        Difficulty::Easy, // difficulty duh
-        30                // time limit
-    };
+    Config config = { get_word_list(), 20, Difficulty::Easy, 30 };
     Game game = new_game(config);
+    State state = State::Playing;
 
-    bool is_running = true;
-
-    while (is_running)
-    {
-        char ch = 0;
-        ssize_t n = read(STDIN_FILENO, &ch, 1);
-
-        if(n > 0)
-        {
-            if (ch == ctrl('c'))
-                is_running = false; 
-            key_handler(game, ch);
-        }
-
-        screen(game, config);
-    }
+    while(state != State::Exit)
+    { run(config, game, state); }
 
     game_over(game, orig);
     std::cout << "Thank you for playing!";
@@ -49,6 +31,7 @@ const char* green()            { return "\033[32m"; }
 const char* red()              { return "\033[31m"; }
 const char* white()            { return "\033[37m"; }
 const char* reset()            { return "\033[0m";  }
+int calculateWPM() { return }
 
 // Returns the terminal size
 Position get_term_size() // NOTE: terminal top-right starts at 1, 1
@@ -177,34 +160,38 @@ void draw(std::stringstream& output, Position d, Args&&... args)
     (output << ... << std::forward<Args>(args));
 }
 
-void screen(const Game& g, const Config& c)
+void render(const Game& g, const Config& c, const State& state)
 {
     clear();
-    auto next_frame = Clock::now();
+    
     Position size = get_term_size();
     std::stringstream frame;
 
-    draw(frame, {1, 1}, "Time: ", time_left(g, c));
-    if(g.typed.size() > g.cursor)
-        draw(frame, {1, size.col / 2}, g.typed[g.cursor]);
+    if(state == State::Playing)
+    {
+        draw(frame, {1, 1}, "Time: ", time_left(g, c));
+        if(g.typed.size() > g.cursor)
+            draw(frame, {1, size.col / 2}, g.typed[g.cursor]);
 
-    std::vector<std::string> split = layout(g);
-    for (size_t i = 0; i < split.size(); i++) {
-        int col = (size.col - MAX_CHAR_PER_ROW) / 2;
-        int row = size.row / 2 - 2;
-        draw(frame, {row + int(i), col}, split[i]);
+        std::vector<std::string> split = layout(g);
+        for (size_t i = 0; i < split.size(); i++) {
+            int col = (size.col - MAX_CHAR_PER_ROW) / 2;
+            int row = size.row / 2 - 2;
+            draw(frame, {row + int(i), col}, split[i]);
+        }
     }
-
-    // WARNING: Temporary draw
-    draw(frame, {3, 1}, "Correct = ",   g.stats.correct);
-    draw(frame, {4, 1}, "Incorrect = ", g.stats.incorrect);
-    draw(frame, {5, 1}, "Missed = ",    g.stats.missed);
-    draw(frame, {6, 1}, "Extra = ",     g.stats.extra);
+    else if(state == State::Results)
+    {
+        // WARNING: Temporary draw
+        draw(frame, {size.row / 2 - 2, size.col / 2 - 6}, "Round over!");
+        draw(frame, {size.row / 2,     size.col / 2 - 8}, "Correct = ",   g.stats.correct);
+        draw(frame, {size.row / 2 + 1, size.col / 2 - 8}, "Incorrect = ", g.stats.incorrect);
+        draw(frame, {size.row / 2 + 2, size.col / 2 - 8}, "Missed = ",    g.stats.missed);
+        draw(frame, {size.row / 2 + 3, size.col / 2 - 8}, "Extra = ",     g.stats.extra);
+    }
 
     std::cout << frame.str() << std::flush;
 
-    next_frame += FRAME_TIME;
-    std::this_thread::sleep_until(next_frame);
 }
 
 bool is_over(const Game& g, const Config& c) 
@@ -229,9 +216,8 @@ void game_over(const Game& game, const termios& terminal)
 
 void key_handler(Game& g, char ch)
 {
-    // start the game
-    if(!g.start && ctrl(ch) != ch && (std::isalpha(ch) || std::isdigit(ch)))
-        g.start = Clock::now();
+    if (!g.start) // if game hasnt started yet
+        return;
 
     // ignore any key press and input after last word
     if (!g.start || g.cursor >= g.words.size()) 
@@ -272,4 +258,32 @@ void key_handler(Game& g, char ch)
         g.stats.incorrect++;
 
     typed += ch;
+}
+
+void run(const Config& config, Game& game, State& state)
+{
+    auto next_frame = Clock::now();
+
+    // 1. input: drain everything typed since the last frame
+    char ch;
+    while (read(STDIN_FILENO, &ch, 1) > 0)
+    {
+        if (ch == ctrl('c')) { state = State::Exit; return; }
+        
+        if(state == State::Playing)
+        {
+            if (!game.start && std::isalnum(static_cast<unsigned char>(ch)))
+                game.start = Clock::now();
+        }
+
+        key_handler(game, ch);
+    }
+    
+    if(state == State::Playing && is_over(game, config)) 
+        state = State::Results;
+    
+    render(game, config, state);
+
+    next_frame += FRAME_TIME;
+    std::this_thread::sleep_until(next_frame);
 }
