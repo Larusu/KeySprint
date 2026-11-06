@@ -287,6 +287,12 @@ void render(const Game& g, const Config& c, const State& state, const Result& re
         draw(frame, {size.row / 2 + 3, size.col / 2 - 8}, "Difficulty = ", to_string(result.difficulty));
         draw(frame, {size.row / 2 + 4, size.col / 2 - 8}, "Time = ", result.date);
     }
+    
+    Position below = {size.row - 5, size.col / 2};
+    int one_fourth = below.col / 2;
+    draw(frame, {below.row, below.col - one_fourth - 7}, "[Ctrl / C] Exit");
+    draw(frame, {below.row, below.col - 9},              "[Ctrl / N] New Game");
+    draw(frame, {below.row, below.col + one_fourth - 8}, "[Ctrl / F] Config");
 
     std::cout << frame.str() << std::flush;
 }
