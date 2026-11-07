@@ -2,8 +2,8 @@
 CXX      = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -Wmissing-declarations
 TARGET   = keysprint
-SOURCES  = main.cpp terminal.cpp game.cpp scoring.cpp render.cpp
-HEADERS  = game.h terminal.h scoring.h render.h
+SOURCES  = main.cpp terminal.cpp game.cpp scoring.cpp render.cpp config.cpp
+HEADERS  = game.h terminal.h scoring.h render.h config.h
 
 all: $(TARGET) run
 
