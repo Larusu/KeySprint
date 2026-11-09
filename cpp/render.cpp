@@ -1,3 +1,4 @@
+#include <cmath>
 #include <sstream>
 #include <iomanip>
 #include <iostream>
@@ -8,11 +9,16 @@
 
 namespace {
 
+// main box
 constexpr int BOX_WIDTH     = 72;
 constexpr int VISIBLE_LINES = 8;
 constexpr int PADDING_X     = 2;
 constexpr int PADDING_Y     = 1;
 constexpr int BOX_HEIGHT    = VISIBLE_LINES + 2 + 2 * PADDING_Y;
+// bar 
+constexpr int BAR_HEIGHT        = 3;
+constexpr int COUNTER_CONTENT_W = 3;
+constexpr int COUNTER_BOX_W     = COUNTER_CONTENT_W + 4;
 
 template <typename... Args>
 void draw(std::stringstream& output, Position d, Args&&... args)
@@ -115,13 +121,21 @@ Position box_origin(Position size)
     };
 }
 
+void draw_counter(std::stringstream& frame, Position box, const Game& g, const Config& c)
+{
+    const int bar_row = std::max(1, box.row - BAR_HEIGHT);
+    draw_box(frame, bar_row, box.col, COUNTER_BOX_W, BAR_HEIGHT);
+
+    const std::string sec = std::to_string(int(std::ceil(time_left(g, c))));
+    const int pad = std::max(0, (COUNTER_CONTENT_W - int(sec.size())) / 2);
+    draw(frame, {bar_row + 1, box.col + 2 + pad}, sec);
+}
+
 void draw_playing(std::stringstream& frame, const Game& g, const Config& c, Position size)
 {
-    draw(frame, {1, 1}, "Time: ", time_left(g, c));
-    if (g.cursor < g.typed.size())
-        draw(frame, {1, size.col / 2}, g.typed[g.cursor]);
+    const Position box = box_origin(size);
+    draw_counter(frame, box, g, c);
 
-    const Position box   = box_origin(size);
     const int text_row   = box.row + 1 + PADDING_Y;
     const int text_col   = box.col + 1 + PADDING_X;
     const int text_width = BOX_WIDTH - 2 - 2 * PADDING_X;
