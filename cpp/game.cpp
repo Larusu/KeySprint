@@ -4,30 +4,22 @@
 #include <cstdlib>
 
 namespace {
-    constexpr size_t MAX_EXTRA = 5; // limit extra letter
-}
+constexpr size_t MAX_EXTRA = 5; // limit extra letter
+constexpr size_t LOOKAHEAD = 40; // Time mode: keep ahead of the cursor
 
-std::vector<std::string>get_word_list()
+std::vector<std::string>pick_random_words(Difficulty d, int count)
 {
-    // TODO: change after json file is implemented
-    return {
-        "Cat", "Dog", "Sun", "Map", "Bag", "Grab",
-        "Animal", "Answer", "Camera", "Castle", "Garden", "Planet",
-        "Absolute","Activity","Balanced","Campaign","Capacity","Concrete",
-        "Constant", "Creative", "Database"
-    };
-}
-
-std::vector<std::string>pick_random_words(const Config& c)
-{
+    const std::vector<std::string>& words = word_list(d);
     std::vector<std::string> picked;
-    if(c.word_list.empty()) 
+    if(words.empty()) 
         return picked;
 
-    picked.reserve(c.word_count);
-    for(size_t i = 0; i < c.word_count; i++)
-        picked.push_back(c.word_list[static_cast<size_t>(rand()) % c.word_list.size()]);
+    picked.reserve(count);
+    for(size_t i = 0; i < size_t(count); i++)
+        picked.push_back(words[static_cast<size_t>(rand()) % words.size()]);
     return picked;
+}
+
 }
 
 void apply_key(Game& g, char ch)
@@ -78,30 +70,48 @@ void apply_key(Game& g, char ch)
     typed += ch;
 }
 
-double time_left(const Game& g, const Config& c)
+double elapsed(const Game& g)
 {
-    if(!g.start)
-        return c.time_limit;
-    double elapsed = std::chrono::duration<double>(Clock::now() - *g.start).count();
-    return std::max(0.0, c.time_limit - elapsed);
+    if (!g.start) return 0.0;
+    return std::chrono::duration<double>(Clock::now() - *g.start).count();
+}
+
+double time_left(const Game& g, const Config& c)   // Time mode only
+{
+    return std::max(0.0, c.time_limit - elapsed(g));
 }
 
 bool is_over(const Game& game, const Config& config)
 {
-    if (game.cursor >= game.words.size())
-        return true;                          // passed the last word
-    if (time_left(game, config) <= 0.0)
-        return true;                          // out of time
+    switch (config.mode)
+    {
+        case Mode::Time:
+            return time_left(game, config) <= 0.0;
+        case Mode::Words:
+        {
+            if (game.cursor >= game.words.size()) return true;
+            const size_t last = game.words.size() - 1;
+            return game.cursor == last && game.typed[last] == game.words[last];
+        }
+    }
+    return false;
+}
 
-    // last word typed correctly
-    const size_t last = game.words.size() - 1;
-    return game.cursor == last && game.typed[last] == game.words[last];
+void top_up_words(Game& game, const Config& config)
+{
+    if (config.mode != Mode::Time) return;
+    if (game.words.size() - game.cursor >= LOOKAHEAD) return;
+
+    const auto more = pick_random_words(config.difficulty, LOOKAHEAD);
+    game.words.insert(game.words.end(), more.begin(), more.end());
+    game.typed.resize(game.words.size()); // what word is must type be
 }
 
 Game new_game(const Config& config) 
 {
     Game game;
-    game.words = pick_random_words(config);
+    const size_t count = (config.mode == Mode::Words) ? config.word_count : 200;
+    game.words = pick_random_words(config.difficulty, count);
     game.typed.resize(game.words.size());
     return game;
 }

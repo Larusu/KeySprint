@@ -46,7 +46,9 @@ void handle_input(App& app)
 
 void update(App& app)
 {
-    if (app.state == State::Playing && is_over(app.game, app.config))
+    if (app.state != State::Playing) return;
+    top_up_words(app.game, app.config);
+    if (is_over(app.game, app.config))
     {
         app.result = make_result(app.game, app.config);
         app.state  = State::Results;
@@ -61,7 +63,6 @@ int main ()
     termios orig = enable_raw_mode();
 
     Config config;
-    config.word_list = get_word_list();
     App app = { config, new_game(config), State::Playing, {} };
 
     while(app.state != State::Exit)

@@ -43,12 +43,9 @@ Result make_result(const Game& g, const Config& c)
     Stats totals = compute_stats(g);
 
     // calculate duration
-    double duration = 0.0;
-    if(g.start)
-    {
-        double lap = std::chrono::duration<double>(Clock::now() - *g.start).count();
-        duration = std::min(lap, static_cast<double>(c.time_limit));
-    }
+    double duration = elapsed(g);
+    if (c.mode == Mode::Time)
+        duration = std::min(duration, double(c.time_limit));
     result.duration = duration;
 
     // calculate accuracy

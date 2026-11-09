@@ -121,6 +121,7 @@ Position box_origin(Position size)
     };
 }
 
+// ---------- bar ----------
 void draw_counter(std::stringstream& frame, Position box, const Game& g, const Config& c)
 {
     const int bar_row = std::max(1, box.row - BAR_HEIGHT);
