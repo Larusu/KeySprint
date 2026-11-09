@@ -7,7 +7,12 @@
 #include "terminal.h"
 
 namespace {
-constexpr int MAX_CHAR_PER_ROW = 50;
+
+constexpr int BOX_WIDTH     = 72;
+constexpr int VISIBLE_LINES = 8;
+constexpr int PADDING_X     = 2;
+constexpr int PADDING_Y     = 1;
+constexpr int BOX_HEIGHT    = VISIBLE_LINES + 2 + 2 * PADDING_Y;
 
 template <typename... Args>
 void draw(std::stringstream& output, Position d, Args&&... args)
@@ -67,8 +72,7 @@ void draw_box(std::stringstream& frame, int row, int col, int width, int height)
     draw(frame, {row + height - 1, col}, "╰", repeat("─", width - 2), "╯");
 }
 
-// Joins colored words into lines of at most MAX_CHAR_PER_ROW characters
-std::vector<std::string> layout(const Game& game)
+std::vector<std::string> layout(const Game& game, size_t max_width)
 {
     std::vector<std::string> lines;
     std::string line;
@@ -78,10 +82,11 @@ std::vector<std::string> layout(const Game& game)
     {
         const std::string& typed  = game.typed[i];
         const std::string& target = game.words[i];
+        size_t word_width = std::max(target.size(), typed.size());
 
-        size_t needed = line_width == 0 ? target.size()
-                                        : line_width + 1 + target.size();
-        if (needed > MAX_CHAR_PER_ROW && !line.empty()) 
+        size_t needed = line_width == 0 ? word_width
+                                        : line_width + 1 + word_width;
+        if (needed > max_width && !line.empty()) 
         {
             lines.push_back(line);
             line.clear();
@@ -93,7 +98,7 @@ std::vector<std::string> layout(const Game& game)
         bool already_passed = i < game.cursor;
         line += colorize_word(target, typed, already_passed);
 
-        line_width += std::max(target.size(), typed.size());
+        line_width += word_width;
     }
 
     if(!line.empty())
@@ -102,17 +107,12 @@ std::vector<std::string> layout(const Game& game)
     return lines;
 }
 
-void draw_centered(std::stringstream& frame, int row, int center_col, std::string_view text)
-{
-    draw(frame, {row, center_col - int(text.size()) / 2}, text);
-}
-
-void draw_footer(std::stringstream& frame, Position size)
-{
-    const int row = size.row - 5;
-    draw_centered(frame, row, size.col / 4,     "[Ctrl / C] Exit");
-    draw_centered(frame, row, size.col / 2,     "[Ctrl / N] New Game");
-    draw_centered(frame, row, size.col * 3 / 4, "[Ctrl / F] Config");
+Position box_origin(Position size)
+{   // + 1 because terminal coordinates is 1 based
+    return {
+        std::max(1, (size.row - BOX_HEIGHT) / 2 + 1),
+        std::max(1, (size.col - BOX_WIDTH)  / 2 + 1)
+    };
 }
 
 void draw_playing(std::stringstream& frame, const Game& g, const Config& c, Position size)
@@ -121,12 +121,33 @@ void draw_playing(std::stringstream& frame, const Game& g, const Config& c, Posi
     if (g.cursor < g.typed.size())
         draw(frame, {1, size.col / 2}, g.typed[g.cursor]);
 
-    const int col = (size.col - MAX_CHAR_PER_ROW) / 2;
-    const int row = size.row / 2 - 2;
+    const Position box   = box_origin(size);
+    const int text_row   = box.row + 1 + PADDING_Y;
+    const int text_col   = box.col + 1 + PADDING_X;
+    const int text_width = BOX_WIDTH - 2 - 2 * PADDING_X;
 
-    const std::vector<std::string> lines = layout(g);
-    for (size_t i = 0; i < lines.size(); i++)
-        draw(frame, {row + int(i), col}, lines[i]);
+    draw_box(frame, box.row, box.col, BOX_WIDTH, BOX_HEIGHT);
+
+    const std::vector<std::string> lines = layout(g, text_width);
+    const size_t line_shown = std::min(lines.size(), size_t(VISIBLE_LINES));
+    for (size_t i = 0; i < line_shown; i++)
+        draw(frame, {text_row + int(i), text_col}, lines[i]);
+}
+
+// ---------- footer ----------
+void draw_ctrl(std::stringstream& frame, int row, int center_col,
+               std::string_view key, std::string_view label)
+{
+    const int width = int(key.size()) + 1 + int(label.size());
+    draw(frame, {row, center_col - width / 2}, green(), key, reset(), ' ', label);
+}
+
+void draw_footer(std::stringstream& frame, Position box)
+{
+    const int row = box.row + BOX_HEIGHT + 1; // 2 rows below the box
+    draw_ctrl(frame, row, box.col + BOX_WIDTH * 1 / 6, "ctrl+n", "new game");
+    draw_ctrl(frame, row, box.col + BOX_WIDTH * 3 / 6, "ctrl+f", "config");
+    draw_ctrl(frame, row, box.col + BOX_WIDTH * 5 / 6, "ctrl+c", "exit");
 }
 
 // WARNING: temporary screen
@@ -148,9 +169,8 @@ void render(const Game& g, const Config& c, const State& s, const Result& r)
 {
     clear_screen();
     const Position size = get_term_size();
+    const Position box  = box_origin(size);
     std::stringstream frame;
-
-    draw_box(frame, 5, 10, 40, 8);
 
     switch (s)
     {
@@ -159,7 +179,7 @@ void render(const Game& g, const Config& c, const State& s, const Result& r)
         case State::Config: //TODO: implement config 
         case State::Exit:    break;
     }
-    draw_footer(frame, size);
+    draw_footer(frame, box);
     std::cout << frame.str() << std::flush;
 }
 
