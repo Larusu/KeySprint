@@ -1,0 +1,45 @@
+Screen {
+    background: #303030;
+}
+
+#game-layout {
+    width: 100%;
+    height: 100%;
+}
+
+#top-controls {
+    height: 3;
+    align: center middle;
+    margin: 7;
+}
+
+#typing-area {
+    width: 100%;
+    height: 1fr;
+    content-align: center middle;
+    color: #636568;
+}
+
+#bottom-controls {
+    height: 3;
+    width: 100%;
+    align: center middle;
+    margin: 5;
+}
+
+#difficulty, #timer {
+    color: #753FEB;
+    background: #211E1E;
+    padding: 0 2;
+    width: auto;
+    height: 3;
+    content-align: center middle;
+    text-style: bold;
+}
+
+#restart, #exit {
+    color: #FFFFFF;
+    width: auto;
+    padding: 0 2;
+    height: 3;
+}
