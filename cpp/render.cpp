@@ -333,13 +333,18 @@ void draw_footer(std::stringstream& frame, Position box, const Game& g, const St
     }
     else if(s == State::Playing && g.start.has_value())
     {
-        draw_ctrl(frame, row, box.col + BOX_WIDTH * 3 / 6, "esc", "quit");
+        draw_ctrl(frame, row, box.col + BOX_WIDTH * 1 / 2, "esc", "quit");
     }
     else if(s == State::Config)
     {
         draw_ctrl(frame, row, box.col + BOX_WIDTH * 1 / 6, "tab",  "new section");
         draw_ctrl(frame, row, box.col + BOX_WIDTH * 3 / 6, "</>",  "left/right");
         draw_ctrl(frame, row, box.col + BOX_WIDTH * 5 / 6, "esc",  "back");
+    }
+    else if(s == State::Results)
+    {
+        draw_ctrl(frame, row, box.col + BOX_WIDTH * 2 / 6, "ctrl+n", "new game");
+        draw_ctrl(frame, row, box.col + BOX_WIDTH * 4 / 6, "ctrl+c", "exit");
     }
 }
 
@@ -358,7 +363,7 @@ void draw_results(std::stringstream& frame, const Result& r, Position size)
 
 }
 
-void render(const Game& g, const Config& c, const State& s, const Result& r)
+void render(const Game& g, const Config& c, const State& s, const Result& r, size_t focus)
 {
     clear_screen();
     const Position size = get_term_size();
@@ -367,9 +372,9 @@ void render(const Game& g, const Config& c, const State& s, const Result& r)
 
     switch (s)
     {
-        case State::Playing: draw_playing(frame, g, c, size);   break;
-        case State::Results: draw_results(frame, r, size);      break;
-        case State::Config:  draw_config(frame, g, c, size, 0); break;
+        case State::Playing: draw_playing(frame, g, c, size);       break;
+        case State::Results: draw_results(frame, r, size);          break;
+        case State::Config:  draw_config(frame, g, c, size, focus); break;
         case State::Exit:    break;
     }
     draw_footer(frame, box, g, s);

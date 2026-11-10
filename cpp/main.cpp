@@ -19,29 +19,83 @@ struct App {
     Game   game;
     State  state;
     std::optional<Result> result;
+    size_t config_focus = 0; // 0 = mode, 1 = difficulty, 2 = time/words
 };
 
-void handle_key(App& app, char ch)
+void restart(App& app)
 {
-    if (ch == ctrl('c')) 
-        app.state = State::Exit; 
-    else if(ch == ctrl('n') && app.state != State::Playing)
-    { // play again
-        app.state = State::Playing; 
-        app.game = new_game(app.config); 
-        app.result.reset();
+    app.game = new_game(app.config);
+    app.result.reset();
+}
+
+void handle_key(App& app, int key)
+{
+    if(key == KEY_UNKNOWN) return;
+    if(key == ctrl('c')) 
+        app.state = State::Exit;
+
+    switch(app.state)
+    {
+    case State::Playing:
+    {
+        if(key == KEY_ESC)
+            restart(app);
+        else if(key == ctrl('n') && !app.game.start)
+            restart(app);
+        else if(key == ctrl('f') && !app.game.start)
+            app.state = app.state == State::Config ? State::Playing : State::Config;
+        else if(key < 256) // prevent ctrl + key
+            apply_key(app.game, static_cast<char>(key));
+        break;
     }
-    else if(ch == ctrl('f') && app.state != State::Config)
-        app.state = State::Config;
-    else if(app.state == State::Playing)
-        apply_key(app.game, ch);
+
+    case State::Config:
+    {
+        bool changed = false;
+        if(key == '\t')
+            app.config_focus = (app.config_focus + 1) % 3;
+        else if(key == KEY_SHIFT_TAB)
+            app.config_focus = (app.config_focus + 2) % 3;
+        else if(key == KEY_LEFT)
+        {
+            adjust_config(app.config, app.config_focus, -1);
+            changed = true;
+        }
+        else if(key == KEY_RIGHT)
+        {
+            adjust_config(app.config, app.config_focus, +1);
+            changed = true;
+        }
+        else if(key == KEY_ESC)
+            app.state = State::Playing;
+        else if(key == ctrl('f'))
+            app.state = State::Playing;
+
+        if (changed)
+            restart(app);
+        break;
+    }
+
+    case State::Results:
+    {
+        if(key == ctrl('n'))
+        {
+            restart(app);
+            app.state = State::Playing;
+        }
+        break;
+    }
+
+    case State::Exit:
+        break;
+    }
 }
 
 void handle_input(App& app)
 {
-    char ch;
-    while (app.state != State::Exit && read(STDIN_FILENO, &ch, 1) > 0)
-        handle_key(app, ch);
+    int key;
+    while(app.state != State::Exit && (key = read_key()) != KEY_NONE)
+        handle_key(app, key);
 }
 
 void update(App& app)
@@ -70,7 +124,7 @@ int main ()
         const auto frame_end = Clock::now() + FRAME_TIME;
         handle_input(app);
         update(app);
-        render(app.game, app.config, app.state, app.result.value_or(Result{}));
+        render(app.game, app.config, app.state, app.result.value_or(Result{}), app.config_focus);
         std::this_thread::sleep_until(frame_end);
     }
 

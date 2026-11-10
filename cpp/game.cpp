@@ -110,7 +110,7 @@ void top_up_words(Game& game, const Config& config)
 Game new_game(const Config& config) 
 {
     Game game;
-    const size_t count = (config.mode == Mode::Words) ? config.word_count : 200;
+    const size_t count = (config.mode == Mode::Words) ? config.word_count : 50;
     game.words = pick_random_words(config.difficulty, count);
     game.typed.resize(game.words.size());
     return game;

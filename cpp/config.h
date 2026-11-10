@@ -42,3 +42,4 @@ struct Config {
 };
 
 const std::vector<std::string>& word_list(Difficulty d);
+void adjust_config(Config& c, size_t focus, int dir); // dir = -1 or +1

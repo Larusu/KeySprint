@@ -3,6 +3,12 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include "terminal.h"
+#include <poll.h>
+
+namespace {
+bool read_byte(char& c) { return read(STDIN_FILENO, &c, 1) > 0; }
+
+}
 
 void show_cursor()             { std::cout << "\033[?25h";   }
 void hide_cursor()             { std::cout << "\033[?25l";   }
@@ -57,4 +63,37 @@ termios enable_raw_mode()
     clear_screen();
 
     return orig;
+}
+
+int read_key()
+{
+    char ch;
+    if(!read_byte(ch))
+        return KEY_NONE;
+    if(ch != '\033')
+        return static_cast<unsigned char>(ch);
+
+    if(!read_byte(ch)) // got ESC, is anything after it?
+        return KEY_ESC; // if no, then base ESC
+
+    if(ch != '[' && ch != 'O')
+        return KEY_UNKNOWN; // alt+key, ignore
+
+    // read until the final byte
+    while(read_byte(ch))
+    {
+        if(ch >= '@' && ch <= '~')
+        {
+            switch(ch)
+            {
+                case 'A': return KEY_UP;
+                case 'B': return KEY_DOWN;
+                case 'C': return KEY_RIGHT;
+                case 'D': return KEY_LEFT;
+                case 'Z': return KEY_SHIFT_TAB;
+                default:  return KEY_UNKNOWN;
+            }
+        }
+    }
+    return KEY_UNKNOWN;
 }
