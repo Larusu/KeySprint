@@ -1,7 +1,18 @@
 #pragma once
 
 #include <string>
+#ifdef _WIN32
+struct TerminalState { 
+    unsigned long in_mode; 
+    unsigned long out_mode; 
+    unsigned int out_cp; 
+};
+#else
 #include <termios.h>
+struct TerminalState { 
+    termios orig; 
+};
+#endif
 
 struct Position { 
     int row; 
@@ -32,6 +43,6 @@ void enter_alternate_screen();
 void exit_alternate_screen();
 void clear_screen();
 Position get_term_size();
-termios enable_raw_mode();
-void restore_terminal(const termios& orig);
+TerminalState enable_raw_mode();
+void restore_terminal(const TerminalState& orig);
 int read_key();

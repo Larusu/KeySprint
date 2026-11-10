@@ -1,5 +1,4 @@
 #include <thread>
-#include <unistd.h>
 #include <iostream>
 #include <iomanip>
 #include <cstdlib>
@@ -113,7 +112,7 @@ void update(App& app)
 int main () 
 {
     srand(time(0));
-    termios orig = enable_raw_mode();
+    TerminalState orig = enable_raw_mode();
 
     Config config;
     App app = { config, new_game(config), State::Playing, {} };

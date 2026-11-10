@@ -70,7 +70,11 @@ Result make_result(const Game& g, const Config& c)
     std::time_t current_time = std::chrono::system_clock::to_time_t(now);
     std::tm local_time;
     std::ostringstream oss;
+#ifdef _WIN32
+    localtime_s(&local_time, &current_time);
+#else
     localtime_r(&current_time, &local_time);
+#endif
     oss << std::put_time(&local_time, "%Y-%m-%dT%H:%M:%S");
     result.date = oss.str();
 
