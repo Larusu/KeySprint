@@ -29,6 +29,8 @@ constexpr int TOTAL_HEIGHT  = BAR_HEIGHT + BOX_HEIGHT + 2;
 constexpr int COUNTER_CONTENT_W = 5;
 constexpr int COUNTER_BOX_W     = COUNTER_CONTENT_W + 4;
 constexpr int SELECTOR_GAP      = 1;
+// fixed weight so the bar doesn't resize when the mode changes
+constexpr int OPTION_WEIGHT     = 3 * 4;
 
 template <typename... Args>
 void draw(std::stringstream& output, Position d, Args&&... args)
@@ -141,6 +143,7 @@ Position box_origin(Position size)
 struct Selector {
     std::vector<std::string> options;
     size_t selected;
+    int weight = 0; // 0 = compute from options
 };
 
 void draw_counter(std::stringstream& frame, Position box, const Game& g, const Config& c)
@@ -183,7 +186,7 @@ std::vector<Selector> make_selectors(const Config& c)
     return {
         { {"Time", "Words"}, static_cast<size_t>(c.mode) },
         { {"Easy", "Medium", "Hard"}, static_cast<size_t>(c.difficulty) },
-        { options_list, selected_index }
+        { options_list, selected_index, OPTION_WEIGHT }
     };
 }
 
@@ -215,6 +218,9 @@ void draw_selector(std::stringstream& frame, int row, int col, int width,
 
 int selector_weight(const Selector& s)
 {
+    if(s.weight > 0)
+        return s.weight;
+
     int longest = 0;
     for(const std::string& c : s.options)
         longest = std::max(longest, int(c.size()));
