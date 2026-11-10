@@ -129,6 +129,30 @@ void draw_playing(std::stringstream& frame, const Game& g, const Config& c, Posi
         draw(frame, {row + int(i), col}, lines[i]);
 }
 
+void draw_config(std::stringstream& frame, const Config& c,
+                 const ConfigEditor& editor, Position size)
+{
+    const int mid = size.row / 2;
+    const int col = size.col / 2 - 18;
+
+    draw_centered(frame, mid - 7, size.col / 2, "Configuration");
+    draw(frame, {mid - 4, col}, "Difficulty:  ", to_string(c.difficulty));
+    draw(frame, {mid - 3, col}, "Word count:  ", c.word_count);
+
+    if (editor.editing_count)
+        draw(frame, {mid - 2, col}, "Editing:     ",
+             editor.count_input.empty() ? "_" : editor.count_input);
+    else
+        draw(frame, {mid - 2, col}, "Press w to edit the word count");
+
+    if (!editor.error.empty())
+        draw(frame, {mid - 1, col}, red(), editor.error, reset());
+
+    draw(frame, {mid + 1, col}, "[1-4] English 1k / 5k / 10k / 25k");
+    draw(frame, {mid + 2, col}, "[w] Edit count   [Enter] Commit count");
+    draw(frame, {mid + 3, col}, "[Ctrl/N] Start   [Ctrl/C] Exit");
+}
+
 // WARNING: temporary screen
 void draw_results(std::stringstream& frame, const Result& r, Position size)
 {
@@ -144,7 +168,8 @@ void draw_results(std::stringstream& frame, const Result& r, Position size)
 
 }
 
-void render(const Game& g, const Config& c, const State& s, const Result& r)
+void render(const Game& g, const Config& c, const State& s, const Result& r,
+            const ConfigEditor& editor)
 {
     clear_screen();
     const Position size = get_term_size();
@@ -156,8 +181,8 @@ void render(const Game& g, const Config& c, const State& s, const Result& r)
     {
         case State::Playing: draw_playing(frame, g, c, size);   break;
         case State::Results: draw_results(frame, r, size); break;
-        case State::Config: //TODO: implement config 
-        case State::Exit:    break;
+        case State::Config: draw_config(frame, c, editor, size); break;
+        case State::Exit:   break;
     }
     draw_footer(frame, size);
     std::cout << frame.str() << std::flush;

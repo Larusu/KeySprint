@@ -1,32 +1,51 @@
 #include "game.h"
 #include <algorithm>
 #include <cctype>
-#include <cstdlib>
+#include <random>
+#include <stdexcept>
 
 namespace {
     constexpr size_t MAX_EXTRA = 5; // limit extra letter
 }
 
-std::vector<std::string>get_word_list()
+std::vector<std::string> pick_random_words(const Config& config)
 {
-    // TODO: change after json file is implemented
-    return {
-        "Cat", "Dog", "Sun", "Map", "Bag", "Grab",
-        "Animal", "Answer", "Camera", "Castle", "Garden", "Planet",
-        "Absolute","Activity","Balanced","Campaign","Capacity","Concrete",
-        "Constant", "Creative", "Database"
-    };
-}
+    const auto pool_size = config.word_list.size();
+    if (config.word_count == 0)
+        throw std::invalid_argument("Word count must be positive");
+    if (pool_size == 0)
+        throw std::invalid_argument("The selected word pool is empty");
+    if (pool_size == 1 && config.word_count > 1)
+        throw std::invalid_argument(
+            "At least two words are needed to prevent adjacent repeats");
 
-std::vector<std::string>pick_random_words(const Config& c)
-{
+    // One dice roller for the app: seed once so restarting a round does not
+    // reset the sequence.
+    static std::mt19937 generator(std::random_device{}());
+
     std::vector<std::string> picked;
-    if(c.word_list.empty()) 
-        return picked;
+    picked.reserve(config.word_count);
+    std::size_t previous = pool_size;
 
-    picked.reserve(c.word_count);
-    for(size_t i = 0; i < c.word_count; i++)
-        picked.push_back(c.word_list[static_cast<size_t>(rand()) % c.word_list.size()]);
+    for (std::size_t i = 0; i < config.word_count; ++i)
+    {
+        std::size_t index;
+        if (i == 0)
+        {
+            index = std::uniform_int_distribution<std::size_t>(
+                0, pool_size - 1)(generator);
+        }
+        else
+        {
+            // Draw among every index except the previous one.
+            index = std::uniform_int_distribution<std::size_t>(
+                0, pool_size - 2)(generator);
+            if (index >= previous)
+                ++index;
+        }
+        picked.push_back(config.word_list[index]);
+        previous = index;
+    }
     return picked;
 }
 

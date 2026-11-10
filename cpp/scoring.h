@@ -7,7 +7,7 @@ struct Result {             // for JSON
     double      wpm        = 0.0;
     double      accuracy   = 0.0; // percent
     double      duration   = 0.0; // seconds
-    Difficulty  difficulty = Difficulty::Easy;
+    Difficulty  difficulty = Difficulty::English1k;
     std::string date       = ""; 
 };
 
