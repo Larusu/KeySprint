@@ -10,10 +10,16 @@ in-progress
 
 ## Running C++ version
 
-### Build and run
+### Build only
 
 ```bash
 make
+```
+
+### Build and run
+
+```bash
+make run
 ```
 
 ### Clean build files
