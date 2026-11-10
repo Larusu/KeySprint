@@ -14,6 +14,7 @@ const char* red()              { return "\033[31m";          }
 const char* white()            { return "\033[37m";          }
 const char* reset()            { return "\033[0m";           }
 const char* dim()              { return "\033[2m";           }
+const char* highlight()        { return "\x1b[37;42m";       }
 
 std::string move_cursor(Position pos)
 { 

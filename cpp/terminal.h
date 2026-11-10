@@ -20,6 +20,7 @@ const char* red();
 const char* white();
 const char* reset();
 const char* dim();
+const char* highlight();
 Position get_term_size();
 termios enable_raw_mode();
 void restore_terminal(const termios& orig);

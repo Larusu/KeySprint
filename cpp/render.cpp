@@ -5,10 +5,10 @@
 #include <algorithm>
 #include <string>
 #include <utility>
-#include "render.h"
 #include <vector>
 #include <string_view>
 #include "terminal.h"
+#include "render.h"
 
 namespace {
 
@@ -187,7 +187,8 @@ std::vector<Selector> make_selectors(const Config& c)
     };
 }
 
-void draw_selector(std::stringstream& frame, int row, int col, int width, const Selector& sel)
+void draw_selector(std::stringstream& frame, int row, int col, int width, 
+        const Selector& sel, bool focused)
 {
     draw_box(frame, row, col, width, BAR_HEIGHT);
 
@@ -202,7 +203,9 @@ void draw_selector(std::stringstream& frame, int row, int col, int width, const 
         const int pad_left  = std::max(0, (slot - text_w) / 2);
         const int pad_right = std::max(0, slot - text_w - pad_left);
 
-        const char* color = (i == sel.selected) ? green() : dim();
+        const char* color = dim();
+        if (i == sel.selected) 
+            color = focused ? highlight() : green(); 
         content += std::string(pad_left, ' ');
         content += std::string(color) + option + reset();
         content += std::string(pad_right, ' ');
@@ -219,7 +222,7 @@ int selector_weight(const Selector& s)
 }
 
 void draw_selectors(std::stringstream& frame, Position box,
-        const std::vector<Selector>& selectors
+        const std::vector<Selector>& selectors, int focus = -1
 ){
     int n = int(selectors.size());
     if(n == 0)
@@ -250,23 +253,13 @@ void draw_selectors(std::stringstream& frame, Position box,
     int row = box.row - BAR_HEIGHT;
     for(int i = 0; i < n; i++)
     {
-        draw_selector(frame, row, col, widths[i], selectors[i]);
+        draw_selector(frame, row, col, widths[i], selectors[i], i == focus);
         col += widths[i] + SELECTOR_GAP;
     }
 }
 
-void draw_playing(std::stringstream& frame, const Game& g, const Config& c, Position size)
+void draw_text(std::stringstream& frame, Position box, const Game& g)
 {
-    const Position box = box_origin(size);
-    draw_box(frame, box.row, box.col, BOX_WIDTH, BOX_HEIGHT);
-
-    const std::vector<Selector> selectors = make_selectors(c);
-    draw_counter(frame, box, g, c);
-
-    // disappear when game start
-    if(!g.start.has_value())
-        draw_selectors(frame, box, selectors);
-
     const int text_width = BOX_WIDTH - 2 - 2 * PADDING_X;
     const Layout lay     = layout(g, size_t(text_width));
 
@@ -287,6 +280,31 @@ void draw_playing(std::stringstream& frame, const Game& g, const Config& c, Posi
             break;
         draw(frame, {text_row + i, text_col}, lay.lines[idx]);
     }
+}
+
+void draw_playing(std::stringstream& frame, const Game& g, const Config& c, Position size)
+{
+    const Position box = box_origin(size);
+    draw_box(frame, box.row, box.col, BOX_WIDTH, BOX_HEIGHT);
+
+    const std::vector<Selector> selectors = make_selectors(c);
+    draw_counter(frame, box, g, c);
+
+    // disappear when game start
+    if(!g.start.has_value())
+        draw_selectors(frame, box, selectors);
+
+    draw_text(frame, box, g);
+}
+
+void draw_config(std::stringstream& frame, const Game& g, const Config& c,
+                 Position size, size_t focus)
+{
+    const Position box = box_origin(size);
+    draw_box(frame, box.row, box.col, BOX_WIDTH, BOX_HEIGHT);
+    draw_counter(frame, box, g, c);
+    draw_selectors(frame, box, make_selectors(c), int(focus)); // always visible here
+    draw_text(frame, box, g);
 }
 
 // ---------- footer ----------
@@ -310,6 +328,12 @@ void draw_footer(std::stringstream& frame, Position box, const Game& g, const St
     else if(s == State::Playing && g.start.has_value())
     {
         draw_ctrl(frame, row, box.col + BOX_WIDTH * 3 / 6, "esc", "quit");
+    }
+    else if(s == State::Config)
+    {
+        draw_ctrl(frame, row, box.col + BOX_WIDTH * 1 / 6, "tab",  "new section");
+        draw_ctrl(frame, row, box.col + BOX_WIDTH * 3 / 6, "</>",  "left/right");
+        draw_ctrl(frame, row, box.col + BOX_WIDTH * 5 / 6, "esc",  "back");
     }
 }
 
@@ -338,8 +362,8 @@ void render(const Game& g, const Config& c, const State& s, const Result& r)
     switch (s)
     {
         case State::Playing: draw_playing(frame, g, c, size);   break;
-        case State::Results: draw_results(frame, r, size); break;
-        case State::Config: //TODO: implement config 
+        case State::Results: draw_results(frame, r, size);      break;
+        case State::Config:  draw_config(frame, g, c, size, 0); break;
         case State::Exit:    break;
     }
     draw_footer(frame, box, g, s);
