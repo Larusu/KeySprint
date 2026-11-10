@@ -71,9 +71,11 @@ bool commit_word_count(Config& config, ConfigEditor& editor)
         value = value * 10 + digit;
     }
 
-    if (value == 0)
+    // Validate the range of the word count 
+    // Change if 10000 is unnecessary
+    if (value == 0 || value > 10000)
     {
-        editor.error = "Word count must be greater than zero";
+        editor.error = "Word count must be between 1 and 10,000";
         return false;
     }
 
