@@ -19,7 +19,7 @@ struct Layout {
 
 // main box
 constexpr int BOX_WIDTH     = 74;
-constexpr int VISIBLE_LINES = 3;
+constexpr int VISIBLE_LINES = 6;
 constexpr int PADDING_X     = 2;
 constexpr int PADDING_Y     = 1;
 constexpr int BOX_HEIGHT    = VISIBLE_LINES + 2 + 2 * PADDING_Y;
@@ -31,6 +31,12 @@ constexpr int COUNTER_BOX_W     = COUNTER_CONTENT_W + 4;
 constexpr int SELECTOR_GAP      = 1;
 // fixed weight so the bar doesn't resize when the mode changes
 constexpr int OPTION_WEIGHT     = 3 * 4;
+
+// results screen
+constexpr int RESULT_ROWS         = 6;
+constexpr int RESULT_BOX_HEIGHT   = RESULT_ROWS + 2 + 2 * PADDING_Y;
+constexpr int RESULT_TOTAL_HEIGHT = 1 + RESULT_BOX_HEIGHT + 2; // header + box + blank + footer
+static_assert(RESULT_ROWS <= VISIBLE_LINES, "results don't fit in the box");
 
 template <typename... Args>
 void draw(std::stringstream& output, Position d, Args&&... args)
@@ -333,7 +339,7 @@ void draw_footer(std::stringstream& frame, Position box, const Game& g, const St
     }
     else if(s == State::Playing && g.start.has_value())
     {
-        draw_ctrl(frame, row, box.col + BOX_WIDTH * 1 / 2, "esc", "quit");
+        draw_ctrl(frame, row, box.col + BOX_WIDTH * 1 / 2, "esc", "restart");
     }
     else if(s == State::Config)
     {
@@ -343,22 +349,39 @@ void draw_footer(std::stringstream& frame, Position box, const Game& g, const St
     }
     else if(s == State::Results)
     {
-        draw_ctrl(frame, row, box.col + BOX_WIDTH * 2 / 6, "ctrl+n", "new game");
-        draw_ctrl(frame, row, box.col + BOX_WIDTH * 4 / 6, "ctrl+c", "exit");
+        draw_ctrl(frame, row, box.col + BOX_WIDTH * 1 / 4, "ctrl+n", "new game");
+        draw_ctrl(frame, row, box.col + BOX_WIDTH * 3 / 4, "ctrl+c", "exit");
     }
 }
 
-// WARNING: temporary screen
+// ---------- result ----------
+void draw_stat(std::stringstream& frame, int row, int mid_col,
+               std::string_view label, const std::string& value)
+{
+    draw(frame, {row, mid_col - int(label.size()) - 1}, label, ':');
+    draw(frame, {row, mid_col + 2}, green(), value, reset());
+}
+
 void draw_results(std::stringstream& frame, const Result& r, Position size)
 {
-    const int mid = size.row / 2;
-    const int col = size.col / 2 - 8;
-    draw(frame, {mid - 2, size.col / 2 - 6}, "Round over!");
-    draw(frame, {mid,     col}, "WPM = ",        r.wpm);
-    draw(frame, {mid + 1, col}, "Accuracy = ",   r.accuracy);
-    draw(frame, {mid + 2, col}, "Duration = ",   r.duration);
-    draw(frame, {mid + 3, col}, "Difficulty = ", to_string(r.difficulty));
-    draw(frame, {mid + 4, col}, "Time = ",       r.date);
+    const Position box = box_origin(size);
+    draw_box(frame, box.row, box.col, BOX_WIDTH, BOX_HEIGHT);
+
+    // header
+    const std::string header = std::string(to_string(r.difficulty)) + "      "
+                             + std::to_string(std::lround(r.duration)) + "s      "
+                             + r.date.substr(0, 10);
+    draw(frame, {box.row - BAR_HEIGHT + 1,
+                 box.col + (BOX_WIDTH - int(header.size())) / 2}, header);
+
+    const int mid = box.col + BOX_WIDTH / 2;
+    int row = box.row + 1 + PADDING_Y;
+    draw_stat(frame, row++, mid, "wpm",       std::to_string(std::lround(r.wpm)));
+    draw_stat(frame, row++, mid, "accuracy",  std::to_string(std::lround(r.accuracy)) + "%");
+    draw_stat(frame, row++, mid, "correct",   std::to_string(r.chars.correct));
+    draw_stat(frame, row++, mid, "incorrect", std::to_string(r.chars.incorrect));
+    draw_stat(frame, row++, mid, "extra",     std::to_string(r.chars.extra));
+    draw_stat(frame, row++, mid, "missed",    std::to_string(r.chars.missed));
 }
 
 }

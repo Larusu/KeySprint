@@ -5,7 +5,7 @@
 
 namespace {
 constexpr size_t MAX_EXTRA = 5; // limit extra letter
-constexpr size_t LOOKAHEAD = 40; // Time mode: keep ahead of the cursor
+constexpr size_t LOOKAHEAD = 50; // Time mode: keep ahead of the cursor
 
 std::vector<std::string>pick_random_words(Difficulty d, int count)
 {
@@ -100,7 +100,8 @@ bool is_over(const Game& game, const Config& config)
 void top_up_words(Game& game, const Config& config)
 {
     if (config.mode != Mode::Time) return;
-    if (game.words.size() - game.cursor >= LOOKAHEAD) return;
+    size_t ahead = config.difficulty == Difficulty::Easy ? LOOKAHEAD + 20 : LOOKAHEAD;
+    if (game.words.size() - game.cursor >= ahead) return;
 
     const auto more = pick_random_words(config.difficulty, LOOKAHEAD);
     game.words.insert(game.words.end(), more.begin(), more.end());
@@ -110,7 +111,8 @@ void top_up_words(Game& game, const Config& config)
 Game new_game(const Config& config) 
 {
     Game game;
-    const size_t count = (config.mode == Mode::Words) ? config.word_count : 50;
+    const size_t word_size = config.difficulty == Difficulty::Easy ? 80 : 70;
+    const size_t count = (config.mode == Mode::Words) ? config.word_count : word_size;
     game.words = pick_random_words(config.difficulty, count);
     game.typed.resize(game.words.size());
     return game;

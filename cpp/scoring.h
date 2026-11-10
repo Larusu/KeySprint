@@ -9,6 +9,7 @@ struct Result {             // for JSON
     double      duration   = 0.0; // seconds
     Difficulty  difficulty = Difficulty::Easy;
     std::string date       = ""; 
+    Stats       chars{};
 };
 
 Result make_result(const Game& game, const Config& config);

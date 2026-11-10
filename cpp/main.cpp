@@ -66,9 +66,8 @@ void handle_key(App& app, int key)
             adjust_config(app.config, app.config_focus, +1);
             changed = true;
         }
-        else if(key == KEY_ESC)
-            app.state = State::Playing;
-        else if(key == ctrl('f'))
+        // escape, ctrl+f, enter
+        else if(key == KEY_ESC || key == ctrl('f') || key == '\r' || key == '\n')
             app.state = State::Playing;
 
         if (changed)
@@ -78,7 +77,7 @@ void handle_key(App& app, int key)
 
     case State::Results:
     {
-        if(key == ctrl('n'))
+        if(key == ctrl('n') || key == KEY_ESC)
         {
             restart(app);
             app.state = State::Playing;

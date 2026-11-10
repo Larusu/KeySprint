@@ -41,6 +41,7 @@ Result make_result(const Game& g, const Config& c)
 
     Result result{};
     Stats totals = compute_stats(g);
+    result.chars = totals;
 
     // calculate duration
     double duration = elapsed(g);
