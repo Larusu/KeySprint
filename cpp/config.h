@@ -16,6 +16,7 @@ constexpr std::string_view to_string(Difficulty d)
         case Difficulty::Medium: return "Medium";
         case Difficulty::Hard:   return "Hard";
     }
+    return "Unknown";
 }
 
 constexpr std::string_view to_string(Mode m)
@@ -25,18 +26,19 @@ constexpr std::string_view to_string(Mode m)
         case Mode::Time:  return "Time";
         case Mode::Words: return "Words";
     }
+    return "Unknown";
 }
 
 inline constexpr Mode       ALL_MODES[]        = { Mode::Time, Mode::Words };
 inline constexpr Difficulty ALL_DIFFICULTIES[] = { Difficulty::Easy, Difficulty::Medium, Difficulty::Hard };
 inline constexpr int        TIME_OPTIONS[]     = { 15, 30, 60, 120 }; // seconds
-inline constexpr size_t     WORD_OPTIONS[]     = { 10, 25, 50, 100 };
+inline constexpr int        WORD_OPTIONS[]     = { 10, 25, 50, 75  };
 
 struct Config {
     Mode       mode       = Mode::Time;
     Difficulty difficulty = Difficulty::Easy;
     int        time_limit = 30;   // Time mode
-    size_t     word_count = 35;   // Words mode
+    int        word_count = 25;   // Words mode
 };
 
 const std::vector<std::string>& word_list(Difficulty d);

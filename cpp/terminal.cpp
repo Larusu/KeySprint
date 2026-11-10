@@ -13,6 +13,7 @@ const char* green()            { return "\033[32m";          }
 const char* red()              { return "\033[31m";          }
 const char* white()            { return "\033[37m";          }
 const char* reset()            { return "\033[0m";           }
+const char* dim()              { return "\033[2m";           }
 
 std::string move_cursor(Position pos)
 { 
