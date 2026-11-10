@@ -12,9 +12,14 @@
 
 namespace {
 
+struct Layout {
+   std::vector<std::string> lines;
+   size_t cursor_line = 0;
+};
+
 // main box
 constexpr int BOX_WIDTH     = 74;
-constexpr int VISIBLE_LINES = 4;
+constexpr int VISIBLE_LINES = 3;
 constexpr int PADDING_X     = 2;
 constexpr int PADDING_Y     = 1;
 constexpr int BOX_HEIGHT    = VISIBLE_LINES + 2 + 2 * PADDING_Y;
@@ -83,9 +88,9 @@ void draw_box(std::stringstream& frame, int row, int col, int width, int height)
     draw(frame, {row + height - 1, col}, "╰", repeat("─", width - 2), "╯");
 }
 
-std::vector<std::string> layout(const Game& game, size_t max_width)
+Layout layout(const Game& game, size_t max_width)
 {
-    std::vector<std::string> lines;
+    Layout out;
     std::string line;
     size_t line_width = 0;
 
@@ -93,29 +98,34 @@ std::vector<std::string> layout(const Game& game, size_t max_width)
     {
         const std::string& typed  = game.typed[i];
         const std::string& target = game.words[i];
-        size_t word_width = std::max(target.size(), typed.size());
+        const size_t word_width = std::max(target.size(), typed.size());
 
         size_t needed = line_width == 0 ? word_width
                                         : line_width + 1 + word_width;
         if (needed > max_width && !line.empty()) 
         {
-            lines.push_back(line);
+            out.lines.push_back(line);
             line.clear();
             line_width = 0;
         }
 
         if (line_width > 0) { line += ' '; line_width++; }
 
+        if(i == game.cursor)
+            out.cursor_line = out.lines.size();
+
         bool already_passed = i < game.cursor;
         line += colorize_word(target, typed, already_passed);
-
         line_width += word_width;
     }
 
     if(!line.empty())
-        lines.push_back(line);
+        out.lines.push_back(line);
 
-    return lines;
+    if(game.cursor >= game.words.size() && !out.lines.empty())
+        out.cursor_line = out.lines.size() - 1;
+
+    return out;
 }
 
 Position box_origin(Position size)
@@ -248,6 +258,8 @@ void draw_selectors(std::stringstream& frame, Position box,
 void draw_playing(std::stringstream& frame, const Game& g, const Config& c, Position size)
 {
     const Position box = box_origin(size);
+    draw_box(frame, box.row, box.col, BOX_WIDTH, BOX_HEIGHT);
+
     const std::vector<Selector> selectors = make_selectors(c);
     draw_counter(frame, box, g, c);
 
@@ -255,16 +267,26 @@ void draw_playing(std::stringstream& frame, const Game& g, const Config& c, Posi
     if(!g.start.has_value())
         draw_selectors(frame, box, selectors);
 
+    const int text_width = BOX_WIDTH - 2 - 2 * PADDING_X;
+    const Layout lay     = layout(g, size_t(text_width));
+
+    // scroll: keep the current line on the 2nd visible row, but never
+    // scroll past the end of the text
+    size_t first = lay.cursor_line > 0 ? lay.cursor_line - 1 : 0;
+    if(lay.lines.size() > size_t(VISIBLE_LINES))
+        first = std::min(first, lay.lines.size() - size_t(VISIBLE_LINES));
+    else
+        first = 0;
+
     const int text_row   = box.row + 1 + PADDING_Y;
     const int text_col   = box.col + 1 + PADDING_X;
-    const int text_width = BOX_WIDTH - 2 - 2 * PADDING_X;
-
-    draw_box(frame, box.row, box.col, BOX_WIDTH, BOX_HEIGHT);
-
-    const std::vector<std::string> lines = layout(g, text_width);
-    const size_t line_shown = std::min(lines.size(), size_t(VISIBLE_LINES));
-    for (size_t i = 0; i < line_shown; i++)
-        draw(frame, {text_row + int(i), text_col}, lines[i]);
+    for(int i = 0; i < VISIBLE_LINES; i++)
+    {
+        const size_t idx = first + size_t(i);
+        if(idx >= lay.lines.size())
+            break;
+        draw(frame, {text_row + i, text_col}, lay.lines[idx]);
+    }
 }
 
 // ---------- footer ----------
