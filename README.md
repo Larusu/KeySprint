@@ -16,16 +16,18 @@ Requires a JDK on your `PATH` (check with `javac -version`).
 
 ```powershell
 cd java
-javac -cp jline-3.26.3.jar *.java
-java --enable-native-access=ALL-UNNAMED -cp ".;jline-3.26.3.jar" KeySprint
+javac -cp ".;jline-3.26.3.jar" *.java
+java -cp ".;jline-3.26.3.jar" KeySprint
 ```
+
+
 
 **macOS / Linux:**
 
 ```bash
 cd java
-javac -cp jline-3.26.3.jar *.java
-java --enable-native-access=ALL-UNNAMED -cp ".:jline-3.26.3.jar" KeySprint
+javac -cp ".:jline-3.26.3.jar" *.java
+java -cp ".:jline-3.26.3.jar" KeySprint
 ```
 
 The only difference is the classpath separator: `;` on Windows, `:` on
