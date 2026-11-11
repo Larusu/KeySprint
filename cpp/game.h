@@ -9,7 +9,7 @@ using Clock = std::chrono::steady_clock;
 enum class State      { Playing, Results, Config, Exit };
 
 struct Stats {
-    int correct   = 0; 
+    int correct   = 0;
     int incorrect = 0;
     int extra     = 0;
     int missed    = 0;

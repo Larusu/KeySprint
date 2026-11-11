@@ -1,22 +1,40 @@
 #include "game.h"
 #include <algorithm>
 #include <cctype>
-#include <cstdlib>
+#include <random>
+#include <stdexcept>
+#include <string_view>
 
 namespace {
 constexpr size_t MAX_EXTRA = 5; // limit extra letter
 constexpr size_t LOOKAHEAD = 50; // Time mode: keep ahead of the cursor
 
-std::vector<std::string>pick_random_words(Difficulty d, int count)
+std::vector<std::string> pick_random_words(const Config& config, std::size_t count,
+                                           std::string_view previous_word = {})
 {
-    const std::vector<std::string>& words = word_list(d);
-    std::vector<std::string> picked;
-    if(words.empty()) 
-        return picked;
+    const auto& pool = config.word_list;
+    if (pool.size() < 2)
+        throw std::invalid_argument("At least two words are needed to prevent adjacent repeats");
 
+    // One dice roller for the app. Refills remember the last roll too.
+    static std::mt19937 generator(std::random_device{}());
+    std::size_t previous = pool.size();
+    if (!previous_word.empty())
+        previous = static_cast<std::size_t>(
+            std::find(pool.begin(), pool.end(), previous_word) - pool.begin());
+
+    std::vector<std::string> picked;
     picked.reserve(count);
-    for(size_t i = 0; i < size_t(count); i++)
-        picked.push_back(words[static_cast<size_t>(rand()) % words.size()]);
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        const bool has_previous = previous < pool.size();
+        std::size_t index = std::uniform_int_distribution<std::size_t>(
+            0, pool.size() - (has_previous ? 2 : 1))(generator);
+        if (has_previous && index >= previous)
+            ++index;
+        picked.push_back(pool[index]);
+        previous = index;
+    }
     return picked;
 }
 
@@ -31,7 +49,7 @@ void apply_key(Game& g, char ch)
         g.start = Clock::now();
     }
     // ignore any key press and input after last word
-    if (g.cursor >= g.words.size()) 
+    if (g.cursor >= g.words.size())
         return;
 
     std::string& typed = g.typed[g.cursor];
@@ -47,7 +65,7 @@ void apply_key(Game& g, char ch)
     else if(ch == 127 || ch == 8) // backspace
     {
         if(!typed.empty())
-            typed.pop_back(); 
+            typed.pop_back();
         else if(g.cursor > 0 && g.typed[g.cursor - 1] != g.words[g.cursor - 1])
             g.cursor--; // can only go to previous word that has mistake
         return;
@@ -100,20 +118,24 @@ bool is_over(const Game& game, const Config& config)
 void top_up_words(Game& game, const Config& config)
 {
     if (config.mode != Mode::Time) return;
-    size_t ahead = config.difficulty == Difficulty::Easy ? LOOKAHEAD + 20 : LOOKAHEAD;
+    size_t ahead = config.difficulty == Difficulty::English1k ? LOOKAHEAD + 20 : LOOKAHEAD;
     if (game.words.size() - game.cursor >= ahead) return;
 
-    const auto more = pick_random_words(config.difficulty, LOOKAHEAD);
+    const auto more = pick_random_words(config, LOOKAHEAD,
+        game.words.empty() ? std::string_view{} : game.words.back());
     game.words.insert(game.words.end(), more.begin(), more.end());
     game.typed.resize(game.words.size()); // what word is must type be
 }
 
-Game new_game(const Config& config) 
+Game new_game(const Config& config)
 {
+    if (config.mode == Mode::Words
+        && (config.word_count < 1 || config.word_count > MAX_WORD_COUNT))
+        throw std::invalid_argument("Word count must be between 1 and 10,000");
     Game game;
-    const size_t word_size = config.difficulty == Difficulty::Easy ? 80 : 70;
+    const size_t word_size = config.difficulty == Difficulty::English1k ? 80 : 70;
     const size_t count = (config.mode == Mode::Words) ? config.word_count : word_size;
-    game.words = pick_random_words(config.difficulty, count);
+    game.words = pick_random_words(config, count);
     game.typed.resize(game.words.size());
     return game;
 }

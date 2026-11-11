@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KeySprint shared English word bank, version 1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "language",
+    "metadata",
+    "levels"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "language": {
+      "const": "en"
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "nominal_counts",
+        "actual_counts",
+        "sources",
+        "filtering",
+        "construction"
+      ],
+      "properties": {
+        "nominal_counts": {
+          "type": "object",
+          "required": [
+            "english_1k",
+            "english_5k",
+            "english_10k",
+            "english_25k"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "english_1k": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "english_5k": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000
+            },
+            "english_10k": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "english_25k": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25000
+            }
+          }
+        },
+        "actual_counts": {
+          "type": "object",
+          "required": [
+            "english_1k",
+            "english_5k",
+            "english_10k",
+            "english_25k"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "english_1k": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "english_5k": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000
+            },
+            "english_10k": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "english_25k": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25000
+            }
+          }
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 2
+        }
+      }
+    },
+    "levels": {
+      "type": "object",
+      "required": [
+        "english_1k",
+        "english_5k",
+        "english_10k",
+        "english_25k"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "english_1k": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1000,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z]+$",
+            "minLength": 3
+          }
+        },
+        "english_5k": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5000,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z]+$",
+            "minLength": 3
+          }
+        },
+        "english_10k": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10000,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z]+$",
+            "minLength": 3
+          }
+        },
+        "english_25k": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 25000,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z]+$",
+            "minLength": 3
+          }
+        }
+      }
+    }
+  }
+}

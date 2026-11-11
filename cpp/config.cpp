@@ -2,70 +2,104 @@
 
 namespace {
 
-// move to the next/previous entry in an array
-template <typename T, size_t N>
-T step(const T (&values)[N], T current, int dir)
+template <typename T, std::size_t N>
+T step(const T (&values)[N], T current, int direction)
 {
-    int i = 0;
-    for(int k = 0; k < int(N); k++)
-        if(values[k] == current)
-            i = k;
-    i = (i + int(N) + dir) % int(N);
-    return values[i];
+    for (std::size_t i = 0; i < N; ++i)
+        if (values[i] == current)
+            return values[(i + N + (direction < 0 ? N - 1 : 1)) % N];
+    // A custom count is visiting from outside the preset carousel.
+    return direction < 0 ? values[N - 1] : values[0];
 }
 
 }
 
-void adjust_config(Config& c, size_t focus, int dir)
+void adjust_config(Config& config, std::size_t focus, int direction)
 {
-    switch(focus)
+    switch (focus)
     {
-        case 0: 
-            c.mode       = step(ALL_MODES,        c.mode,       dir); 
-            break;
-        case 1:
-            c.difficulty = step(ALL_DIFFICULTIES, c.difficulty, dir); 
-            break;
+        case 0: config.mode = step(ALL_MODES, config.mode, direction); break;
+        case 1: config.difficulty = step(ALL_DIFFICULTIES, config.difficulty, direction); break;
         case 2:
-            if(c.mode == Mode::Time)
-                c.time_limit = step(TIME_OPTIONS, c.time_limit, dir);
+            if (config.mode == Mode::Time)
+                config.time_limit = step(TIME_OPTIONS, config.time_limit, direction);
             else
-                c.word_count = step(WORD_OPTIONS, c.word_count, dir);
+                config.word_count = step(WORD_OPTIONS, config.word_count, direction);
             break;
     }
 }
 
-const std::vector<std::string>& word_list(Difficulty d)
+void handle_config_key(Config& config, ConfigEditor& editor, char ch)
 {
-    static const std::vector<std::string> easy = {
-        "cat", "dog", "sun", "map", "bag", "grab",
-        "run", "book", "tree", "fish", "blue", "rain",
-        "house", "apple", "water", "chair", "happy", "light",
-        "mouse", "cloud", "bread", "green", "smile", "plant"
-    };
-
-    static const std::vector<std::string> medium = {
-        "animal", "answer", "camera", "castle", "garden", "planet",
-        "bottle", "window", "school", "friend", "market", "summer",
-        "winter", "morning", "people", "family", "picture", "village",
-        "kitchen", "forest", "bridge", "travel", "office", "number"
-    };
-
-    static const std::vector<std::string> hard = {
-        "absolute", "activity", "balanced", "campaign",
-        "capacity", "concrete", "constant", "creative", "database",
-        "adventure", "beautiful", "challenge", "computer",
-        "direction", "education", "environment", "important",
-        "knowledge", "language", "management", "necessary",
-        "operation", "performance", "production", "technology",
-        "understand", "development", "experience", "information"
-    };
-
-    switch (d)
+    if (editor.editing_count)
     {
-        case Difficulty::Easy:   return easy;
-        case Difficulty::Medium: return medium;
-        case Difficulty::Hard:   return hard;
+        if (ch >= '0' && ch <= '9')
+        {
+            if (editor.count_input.size() < 20)
+                editor.count_input += ch;
+        }
+        else if (ch == 127 || ch == 8)
+        {
+            if (!editor.count_input.empty())
+                editor.count_input.pop_back();
+        }
+        else if (ch == '\r' || ch == '\n')
+            commit_word_count(config, editor);
+        return;
     }
-    return easy;
+
+    switch (ch)
+    {
+        case '1': config.difficulty = Difficulty::English1k; break;
+        case '2': config.difficulty = Difficulty::English5k; break;
+        case '3': config.difficulty = Difficulty::English10k; break;
+        case '4': config.difficulty = Difficulty::English25k; break;
+        case 'w':
+        case 'W':
+            if (config.mode == Mode::Words)
+            {
+                editor.editing_count = true;
+                editor.count_input.clear();
+                editor.error.clear();
+            }
+            break;
+    }
+}
+
+bool commit_word_count(Config& config, ConfigEditor& editor)
+{
+    if (!editor.editing_count)
+        return true;
+    if (editor.count_input.empty())
+    {
+        editor.error = "Word count cannot be empty";
+        return false;
+    }
+
+    int value = 0;
+    for (char ch : editor.count_input)
+    {
+        if (ch < '0' || ch > '9')
+        {
+            editor.error = "Word count must contain digits only";
+            return false;
+        }
+        // Stop before multiplying: even a mountain of digits cannot overflow.
+        const int digit = ch - '0';
+        if (value > (MAX_WORD_COUNT - digit) / 10)
+        {
+            editor.error = "Word count must be between 1 and 10,000";
+            return false;
+        }
+        value = value * 10 + digit;
+    }
+    if (value == 0)
+    {
+        editor.error = "Word count must be between 1 and 10,000";
+        return false;
+    }
+
+    config.word_count = value;
+    editor = ConfigEditor{};
+    return true;
 }
