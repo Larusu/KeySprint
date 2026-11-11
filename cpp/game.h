@@ -1,19 +1,15 @@
 #pragma once
 
 #include <chrono>
-#include <cstddef>
 #include <optional>
-#include <string>
-#include <vector>
-
 #include "config.h"
 
 using Clock = std::chrono::steady_clock;
 
-enum class State { Playing, Results, Config, Exit };
+enum class State      { Playing, Results, Config, Exit };
 
 struct Stats {
-    int correct   = 0; 
+    int correct   = 0;
     int incorrect = 0;
     int extra     = 0;
     int missed    = 0;
@@ -27,8 +23,9 @@ struct Game {                       // mutable per game
     Stats keystrokes;
 };
 
-std::vector<std::string> pick_random_words(const Config& config);
+void top_up_words(Game& game, const Config& config);
 Game new_game(const Config& config);
 void apply_key(Game& game, char ch);
 bool is_over(const Game& game, const Config& config);
+double elapsed(const Game& g);
 double time_left(const Game& game, const Config& config);

@@ -1,67 +1,85 @@
-# C++ word-bank usage
+# C++ usage
 
-The C++ game loads the shared vocabulary from `data/words.json` once at startup.
-The pools contain 933, 4,772, 9,474, and 24,165 words. Every practice word has
-at least three lowercase letters. See [source and license notes](../data/SOURCES.md).
+The C++ version uses main's boxed layout, scrolling text, Time/Words selectors,
+and character statistics. Shared vocabulary is loaded once from `data/words.json`.
+Java and Python application files are unchanged relative to main.
 
 ## Build and run
 
 From the project root:
 
 ```bash
-make -C cpp keysprint
-./cpp/keysprint
+make -C cpp
+make -C cpp run
 ```
 
-An explicit data path is also supported:
+`make` builds only. `make run` starts the game. From inside `cpp`, omit `-C cpp`.
+On Windows, build with a C++17 compiler and GNU Make; the target is `keysprint.exe`.
+The native Windows terminal handling from main is retained.
+
+You can also launch with an explicit data path:
 
 ```bash
 ./cpp/keysprint data/words.json
 ```
 
-From inside `cpp`, run `./keysprint`. Without an argument, the program looks for
-`data/words.json`, then `../data/words.json`. Startup reports invalid or missing
-vocabulary before enabling terminal input mode.
+Without a path, the game tries `data/words.json`, then `../data/words.json`.
+Invalid or missing data is reported before terminal input mode is enabled.
+Each pool must have at least two distinct words so timed refills can avoid repeats.
+The vendored nlohmann/json 3.12.0 header and its Makefile include path are included.
 
-The vendored parser is `cpp/include/nlohmann/json.hpp` (nlohmann/json 3.12.0).
-The Makefile already includes its search path and rebuild dependency.
+## Modes and vocabulary
+
+The default is Time mode, 30 seconds, English 1k. The timer starts on the first
+letter or digit. Time mode keeps adding words until the timer ends. Words mode
+has no time limit and finishes when the last word is submitted or typed correctly.
+
+Time presets are 15, 30, 60, and 120 seconds. Word-count presets are 10, 25, 50,
+and 75, with 25 selected by default. Custom counts accept 1 through 10,000.
+
+Vocabulary choices are English 1k, 5k, 10k, and 25k. The actual pool sizes are
+933, 4,772, 9,474, and 24,165. Every word has at least three lowercase letters.
+Larger pools include the smaller pools. Repeats are allowed, except consecutive
+words, including the boundary between timed refills.
+See [source and license notes](../data/SOURCES.md).
 
 ## Controls
 
 | Key | Action |
 | --- | --- |
-| Ctrl+F | Open configuration from gameplay or results |
-| 1 / 2 / 3 / 4 | Select English 1k / 5k / 10k / 25k outside count editing |
-| w | Begin editing the session word count |
-| Digits / Backspace | Edit the draft count |
-| Enter | Commit the draft count |
-| Ctrl+N | Start a new session from configuration or results |
-| Ctrl+C | Exit |
+| Ctrl+F | Open configuration from gameplay or results; abandon the old round |
+| Tab / Shift+Tab | Move forward/back between the three configuration sections |
+| Left / Right | Cycle the focused setting |
+| 1 / 2 / 3 / 4 | Select English 1k / 5k / 10k / 25k in configuration |
+| w | Begin a custom count in Words-mode configuration |
+| Digits / Backspace | Edit the count draft; digits do not change difficulty here |
+| Enter | Save a count draft; otherwise leave configuration |
+| Esc | Cancel a count draft; otherwise leave configuration or restart gameplay/results |
+| Ctrl+N | Save and start from configuration, restart from results, or reshuffle before typing |
+| Ctrl+C | Exit from any screen |
 
-The default settings are English 1k, 100 words, and a 30-second limit. The current
-implementation ends a round when its words are completed or the timer expires;
-it does not provide separate Time and Words modes. Configuration applies to the
-next session started with Ctrl+N. Invalid empty, zero, and overflowing counts
-retain the previous committed value and display an error.
+Selector changes update the preview while configuration stays open. Enter,
+Esc, or Ctrl+F returns to gameplay. During count editing, Ctrl+F saves the draft
+and returns to gameplay; invalid drafts stay open with an error. Ctrl+N also
+validates the draft before starting. Esc discards only the draft.
 
-## File responsibilities
+After a custom count, Right selects the first preset and Left selects the last.
+The selected custom number is shown accurately in the bar. The terminal needs
+at least 74 columns and 17 rows; a smaller window shows a resize message.
 
-- `word_bank.cpp`: parse and validate the shared JSON; return cached pools.
-- `config.cpp`: select difficulty and edit the session count.
-- `game.cpp`: sample session words without adjacent duplicates and process input.
-- `main.cpp`: find the data, route controls, and start sessions.
-- `render.cpp`: draw gameplay, configuration, and results.
+## Checks
 
-## Current integration limits
-
-The working branch is based on an older main. Current remote main already has
-separate Time/Words modes, selector navigation, and scrolling; preserve those
-features when integrating this implementation. Avoid copying the old C++ files
-wholesale over current main. Large accepted counts also need an allocation bound
-and exception-safe terminal restoration before the feature is ready to merge.
-
-## Clean the build
+Run the C++ regression suite from the project root:
 
 ```bash
-make -C cpp clean
+make -C cpp test
 ```
+
+On Linux/macOS, the terminal smoke tests also check real keyboard input,
+configuration, results, layout boundaries, and terminal restoration:
+
+```bash
+python3 cpp/tests/terminal_smoke.py
+```
+
+Clean the game and test executables with `make -C cpp clean`.

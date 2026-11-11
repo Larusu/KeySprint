@@ -27,7 +27,7 @@ WordBank load_word_bank(const std::string& path)
     const auto document = nlohmann::json::parse(file);
 
     const auto& version = document.at("schema_version");
-    if (!version.is_number_integer() || version.get<int>() != 1)
+    if (!version.is_number_integer() || version != 1)
         throw std::runtime_error("Unsupported word-bank schema version");
     if (document.at("language") != "en")
         throw std::runtime_error("Expected an English word bank");
@@ -41,8 +41,9 @@ WordBank load_word_bank(const std::string& path)
                             "english_10k", "english_25k"})
     {
         auto words = levels.at(key).get<std::vector<std::string>>();
-        if (words.empty())
-            throw std::runtime_error(std::string("Empty word pool: ") + key);
+        if (words.size() < 2)
+            throw std::runtime_error(
+                std::string("Word pool needs at least two words: ") + key);
 
         const auto& count = document.at("metadata").at("actual_counts").at(key);
         if (as_count(count) != words.size())

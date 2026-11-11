@@ -3,50 +3,41 @@
 #include <cctype>
 #include <random>
 #include <stdexcept>
+#include <string_view>
 
 namespace {
-    constexpr size_t MAX_EXTRA = 5; // limit extra letter
-}
+constexpr size_t MAX_EXTRA = 5; // limit extra letter
+constexpr size_t LOOKAHEAD = 50; // Time mode: keep ahead of the cursor
 
-std::vector<std::string> pick_random_words(const Config& config)
+std::vector<std::string> pick_random_words(const Config& config, std::size_t count,
+                                           std::string_view previous_word = {})
 {
-    const auto pool_size = config.word_list.size();
-    if (config.word_count == 0)
-        throw std::invalid_argument("Word count must be positive");
-    if (pool_size == 0)
-        throw std::invalid_argument("The selected word pool is empty");
-    if (pool_size == 1 && config.word_count > 1)
-        throw std::invalid_argument(
-            "At least two words are needed to prevent adjacent repeats");
+    const auto& pool = config.word_list;
+    if (pool.size() < 2)
+        throw std::invalid_argument("At least two words are needed to prevent adjacent repeats");
 
-    // One dice roller for the app: seed once so restarting a round does not
-    // reset the sequence.
+    // One dice roller for the app. Refills remember the last roll too.
     static std::mt19937 generator(std::random_device{}());
+    std::size_t previous = pool.size();
+    if (!previous_word.empty())
+        previous = static_cast<std::size_t>(
+            std::find(pool.begin(), pool.end(), previous_word) - pool.begin());
 
     std::vector<std::string> picked;
-    picked.reserve(config.word_count);
-    std::size_t previous = pool_size;
-
-    for (std::size_t i = 0; i < config.word_count; ++i)
+    picked.reserve(count);
+    for (std::size_t i = 0; i < count; ++i)
     {
-        std::size_t index;
-        if (i == 0)
-        {
-            index = std::uniform_int_distribution<std::size_t>(
-                0, pool_size - 1)(generator);
-        }
-        else
-        {
-            // Draw among every index except the previous one.
-            index = std::uniform_int_distribution<std::size_t>(
-                0, pool_size - 2)(generator);
-            if (index >= previous)
-                ++index;
-        }
-        picked.push_back(config.word_list[index]);
+        const bool has_previous = previous < pool.size();
+        std::size_t index = std::uniform_int_distribution<std::size_t>(
+            0, pool.size() - (has_previous ? 2 : 1))(generator);
+        if (has_previous && index >= previous)
+            ++index;
+        picked.push_back(pool[index]);
         previous = index;
     }
     return picked;
+}
+
 }
 
 void apply_key(Game& g, char ch)
@@ -58,7 +49,7 @@ void apply_key(Game& g, char ch)
         g.start = Clock::now();
     }
     // ignore any key press and input after last word
-    if (g.cursor >= g.words.size()) 
+    if (g.cursor >= g.words.size())
         return;
 
     std::string& typed = g.typed[g.cursor];
@@ -74,7 +65,7 @@ void apply_key(Game& g, char ch)
     else if(ch == 127 || ch == 8) // backspace
     {
         if(!typed.empty())
-            typed.pop_back(); 
+            typed.pop_back();
         else if(g.cursor > 0 && g.typed[g.cursor - 1] != g.words[g.cursor - 1])
             g.cursor--; // can only go to previous word that has mistake
         return;
@@ -97,30 +88,54 @@ void apply_key(Game& g, char ch)
     typed += ch;
 }
 
-double time_left(const Game& g, const Config& c)
+double elapsed(const Game& g)
 {
-    if(!g.start)
-        return c.time_limit;
-    double elapsed = std::chrono::duration<double>(Clock::now() - *g.start).count();
-    return std::max(0.0, c.time_limit - elapsed);
+    if (!g.start) return 0.0;
+    return std::chrono::duration<double>(Clock::now() - *g.start).count();
+}
+
+double time_left(const Game& g, const Config& c)   // Time mode only
+{
+    return std::max(0.0, c.time_limit - elapsed(g));
 }
 
 bool is_over(const Game& game, const Config& config)
 {
-    if (game.cursor >= game.words.size())
-        return true;                          // passed the last word
-    if (time_left(game, config) <= 0.0)
-        return true;                          // out of time
-
-    // last word typed correctly
-    const size_t last = game.words.size() - 1;
-    return game.cursor == last && game.typed[last] == game.words[last];
+    switch (config.mode)
+    {
+        case Mode::Time:
+            return time_left(game, config) <= 0.0;
+        case Mode::Words:
+        {
+            if (game.cursor >= game.words.size()) return true;
+            const size_t last = game.words.size() - 1;
+            return game.cursor == last && game.typed[last] == game.words[last];
+        }
+    }
+    return false;
 }
 
-Game new_game(const Config& config) 
+void top_up_words(Game& game, const Config& config)
 {
+    if (config.mode != Mode::Time) return;
+    size_t ahead = config.difficulty == Difficulty::English1k ? LOOKAHEAD + 20 : LOOKAHEAD;
+    if (game.words.size() - game.cursor >= ahead) return;
+
+    const auto more = pick_random_words(config, LOOKAHEAD,
+        game.words.empty() ? std::string_view{} : game.words.back());
+    game.words.insert(game.words.end(), more.begin(), more.end());
+    game.typed.resize(game.words.size()); // what word is must type be
+}
+
+Game new_game(const Config& config)
+{
+    if (config.mode == Mode::Words
+        && (config.word_count < 1 || config.word_count > MAX_WORD_COUNT))
+        throw std::invalid_argument("Word count must be between 1 and 10,000");
     Game game;
-    game.words = pick_random_words(config);
+    const size_t word_size = config.difficulty == Difficulty::English1k ? 80 : 70;
+    const size_t count = (config.mode == Mode::Words) ? config.word_count : word_size;
+    game.words = pick_random_words(config, count);
     game.typed.resize(game.words.size());
     return game;
 }

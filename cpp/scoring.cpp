@@ -41,14 +41,12 @@ Result make_result(const Game& g, const Config& c)
 
     Result result{};
     Stats totals = compute_stats(g);
+    result.chars = totals;
 
     // calculate duration
-    double duration = 0.0;
-    if(g.start)
-    {
-        double lap = std::chrono::duration<double>(Clock::now() - *g.start).count();
-        duration = std::min(lap, static_cast<double>(c.time_limit));
-    }
+    double duration = elapsed(g);
+    if (c.mode == Mode::Time)
+        duration = std::min(duration, double(c.time_limit));
     result.duration = duration;
 
     // calculate accuracy
@@ -72,7 +70,11 @@ Result make_result(const Game& g, const Config& c)
     std::time_t current_time = std::chrono::system_clock::to_time_t(now);
     std::tm local_time;
     std::ostringstream oss;
+#ifdef _WIN32
+    localtime_s(&local_time, &current_time);
+#else
     localtime_r(&current_time, &local_time);
+#endif
     oss << std::put_time(&local_time, "%Y-%m-%dT%H:%M:%S");
     result.date = oss.str();
 
