@@ -8,6 +8,16 @@ in-progress
 
 Requires JDK 17 or newer. The JLine jar is bundled in `java/`.
 
+### VS Code setup
+
+Open the project root (`KeySprint/`) in VS Code. The checked-in
+`.vscode/settings.json` sets `java/` as the Java source folder and adds the
+bundled JLine jar to the project's referenced libraries. This lets VS Code
+resolve `org.jline` imports and types such as `Terminal`.
+
+If those errors remain after opening the project, run **Java: Clean Java
+Language Server Workspace** from the Command Palette and let VS Code reload.
+
 ### Build and run
 
 Requires a JDK on your `PATH` (check with `javac -version`).
