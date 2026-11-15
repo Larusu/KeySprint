@@ -113,7 +113,7 @@ make -C cpp run
 Or run with an explicit word-bank path:
 
 ```bash
-./cpp/keysprint data/words.json
+./cpp/build/keysprint data/words.json
 ```
 
 On Windows, use `cpp/keysprint.exe` after building with a C++17 compiler and GNU Make.
