@@ -5,7 +5,6 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <utility>
 #include "config.h"
 #include "game.h"
 #include "terminal.h"
@@ -69,14 +68,17 @@ void handle_key(App& app, int key)
         app.state = State::Exit;
         return;
     }
-    if (key == ctrl('f') && app.state != State::Config)
+
+    const bool in_game = app.state == State::Playing && app.game.start.has_value();
+
+    if (key == ctrl('f') && app.state != State::Config && !in_game)
     {
         app.config_editor = ConfigEditor{};
         restart(app); // Abandon the old timer before showing the new preview.
         app.state = State::Config;
         return;
     }
-    if (key == ctrl('n') && (app.state != State::Playing || !app.game.start))
+    if (key == ctrl('n') && !in_game)
     {
         if (!commit_word_count(app.config, app.config_editor))
             return;
