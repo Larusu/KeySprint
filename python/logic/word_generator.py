@@ -7,7 +7,7 @@ temp_word_bank = {
     "25k": ["pizzas", "tangible", "psychotic", "cable", "legal", "manage", "uttermost", "sweltering", "dysfunctional", "attraction"]
 }
 
-def generate_words(difficulty, count=15):
+def generate_words(difficulty, count=30):
     if (difficulty not in temp_word_bank):
         return
     else:

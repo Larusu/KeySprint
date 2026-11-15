@@ -7,27 +7,14 @@ Screen {
     height: 100%;
 }
 
-#top-controls {
+#top-controls-wrapper {
+    width: 100%;
     height: 3;
     align: center middle;
-    margin: 7;
+    margin: 15 0 5 0;
 }
 
-#typing-area {
-    width: 100%;
-    height: 1fr;
-    content-align: center middle;
-    color: #636568;
-}
-
-#bottom-controls {
-    height: 3;
-    width: 100%;
-    align: center middle;
-    margin: 5;
-}
-
-#difficulty, #timer {
+#selected-time {
     color: #753FEB;
     background: #211E1E;
     padding: 0 2;
@@ -37,7 +24,80 @@ Screen {
     text-style: bold;
 }
 
-#restart, #exit {
+#setting-box,
+#difficulty-options,
+#timer-options {
+    background: #211E1E;
+    width: auto;
+    height: 3;
+    padding: 0 1;
+    align: center middle;
+}
+
+#selected-time,
+#setting-box,
+#difficulty-options,
+#timer-options {
+    margin: 0 1;
+}
+
+#difficulty,
+#timer {
+    color: #FFFFFF;
+    background: transparent;
+    padding: 0 2;
+    width: auto;
+    height: 3;
+    content-align: center middle;
+    text-style: bold;
+}
+
+#difficulty-option1,
+#difficulty-option2,
+#difficulty-option3,
+#difficulty-option4,
+#timer-option1,
+#timer-option2,
+#timer-option3,
+#timer-option4 {
+    color: #FFFFFF;
+    background: transparent;
+    padding: 0 2;
+    width: auto;
+    height: 3;
+    content-align: center middle;
+    text-style: bold;
+}
+
+#typing-wrapper {
+    width: 100%;
+    height: 10%;
+    align: center middle;
+}
+
+#typing-container {
+    width: 50%;
+    height: auto;
+}
+
+#typing-area {
+    width: 100%;
+    height: auto;
+    content-align: center middle;
+    text-align: center;
+    color: #636568;
+    text-style: bold;
+}
+
+#bottom-controls {
+    width: 100%;
+    height: 3;
+    align: center middle;
+    margin: 5 0;
+}
+
+#restart,
+#exit {
     color: #FFFFFF;
     width: auto;
     padding: 0 2;
