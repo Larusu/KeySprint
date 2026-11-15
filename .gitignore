@@ -4,3 +4,4 @@ keysprint
 __pycache__/
 *.pyc
 *.class
+build/
