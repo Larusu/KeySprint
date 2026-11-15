@@ -87,6 +87,10 @@ rm java/*.class
 - `Enter` selects a value or starts the game.
 - Modes: Time (`15/30/60/120` seconds) and Words (`10/25/50/75`).
 - In Words mode, the `custom` preset opens a 1–10,000 word-count editor.
+- The box keeps its original size with four visible rows of wrapped words.
+  As you type, the text scrolls to follow the active line, keeping one previous
+  line visible. The minimum terminal size is 78 columns by 11 rows for every
+  word count.
 - The timer starts on the first letter or digit you type.
 - During a game, `Esc` returns to the menu; `Ctrl+C` exits.
 - On the results screen, `Esc` returns to the menu and `Ctrl+C` exits; other
