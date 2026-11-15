@@ -26,6 +26,9 @@ const char* white();
 const char* reset();
 const char* dim();
 const char* highlight();
+const char* erase_screen();   // escape code only; clear_screen() below prints it
+const char* sync_begin();     // start/end of one atomic screen update (ignored by
+const char* sync_end();       // terminals that don't know it)
 constexpr char ctrl(char c) { return c & 0x1F; }
 
 constexpr int KEY_NONE      = -1;   // nothing to read
@@ -46,3 +49,4 @@ Position get_term_size();
 TerminalState enable_raw_mode();
 void restore_terminal(const TerminalState& orig);
 int read_key();
+void write_out(const std::string& data); // Sends the whole string to the terminal in one go

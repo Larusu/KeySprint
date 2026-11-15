@@ -9,6 +9,7 @@
         #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
     #endif
 #else
+    #include <cerrno>
     #include <unistd.h>
     #include <sys/ioctl.h>
 #endif
@@ -18,7 +19,10 @@ void show_cursor()             { std::cout << "\033[?25h";   }
 void hide_cursor()             { std::cout << "\033[?25l";   }
 void enter_alternate_screen()  { std::cout << "\033[?1049h"; }
 void exit_alternate_screen()   { std::cout << "\033[?1049l"; }
-void clear_screen()            { std::cout << "\033[2J";     }
+void clear_screen()            { std::cout << erase_screen();}
+const char* erase_screen()     { return "\033[2J";           }
+const char* sync_begin()       { return "\033[?2026h";       }
+const char* sync_end()         { return "\033[?2026l";       }
 const char* green()            { return "\033[32m";          }
 const char* red()              { return "\033[31m";          }
 const char* white()            { return "\033[37m";          }
@@ -44,6 +48,20 @@ Position get_term_size()
     }
     std::cerr << "ERROR: Cannot get terminal size. \n";
     return {1, 1};
+}
+
+void write_out(const std::string& data)
+{
+    std::cout.flush();   // keep the order with anything still buffered in cout
+    HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+    size_t done = 0;
+    while(done < data.size())
+    {   // one WriteFile for the whole frame; the loop only handles partial writes
+        DWORD n = 0;
+        if(!WriteFile(out, data.data() + done, static_cast<DWORD>(data.size() - done), &n, nullptr) || n == 0)
+            break;
+        done += n;
+    }
 }
 
 TerminalState enable_raw_mode()
@@ -132,12 +150,28 @@ Position get_term_size()
     return {1, 1};
 }  
 
+void write_out(const std::string& data)
+{
+    std::cout.flush();   // keep the order with anything still buffered in cout
+    size_t done = 0;
+    while(done < data.size())
+    {   // one write() for the whole frame; the loop only handles partial writes
+        const ssize_t n = write(STDOUT_FILENO, data.data() + done, data.size() - done);
+        if(n < 0 && errno == EINTR)
+            continue;
+        if(n <= 0)
+            break;
+        done += static_cast<size_t>(n);
+    }
+}
+
 void restore_terminal(const TerminalState& saved)
 {
     show_cursor();
     clear_screen();
     tcsetattr(STDIN_FILENO, TCSANOW, &saved.orig);
     exit_alternate_screen();
+    std::cout << std::flush;
 }
 
 TerminalState enable_raw_mode()
