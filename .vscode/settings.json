@@ -1,4 +1,0 @@
-{
-    "java.project.sourcePaths": ["java"],
-    "java.project.referencedLibraries": ["java/jline-3.26.3.jar"]
-}

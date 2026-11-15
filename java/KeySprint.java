@@ -81,11 +81,12 @@ public class KeySprint {
     private int termHeight;
     private int boxRow;
     private int boxCol;
-    private int bodyRows = BASE_BODY_ROWS;
+    // Keep the original box height for every word count; longer rounds scroll.
+    private final int bodyRows = BASE_BODY_ROWS;
     private boolean waitingForSize;
     private boolean timerPaused;
     private long pauseStartNanos;
-    private int[] prevBodyLen = new int[BASE_BODY_ROWS];
+    private final int[] prevBodyLen = new int[BASE_BODY_ROWS];
     private String lastC1 = "";
 
     // Computed by drawBody.
@@ -201,28 +202,6 @@ public class KeySprint {
         return termWidth >= BOX_WIDTH && termHeight >= requiredHeight();
     }
 
-    private void setBodyRows(int rows) {
-        rows = Math.max(1, rows);
-        if (rows == bodyRows && prevBodyLen.length == rows) return;
-        bodyRows = rows;
-        prevBodyLen = new int[rows];
-    }
-
-    private int wrappedLineCount() {
-        int line = 0;
-        int lineW = 0;
-        for (int i = 0; i < picked.size(); i++) {
-            int wlen = Math.max(picked.get(i).length(), typedWords.get(i).length());
-            if (lineW > 0 && lineW + 1 + wlen > WORD_WRAP) {
-                line++;
-                lineW = 0;
-            }
-            if (lineW > 0) lineW++;
-            lineW += wlen;
-        }
-        return Math.max(1, line + 1);
-    }
-
     private void updateSize() {
         Size size = terminal.getSize();
         int w = Math.max(1, size.getColumns());
@@ -234,6 +213,8 @@ public class KeySprint {
     }
 
     private void relayout() {
+        // Resizing the terminal only recenters the fixed box. The selected
+        // word count never changes the minimum playable terminal size.
         if (!sizeOk()) {
             if (!waitingForSize) {
                 waitingForSize = true;
@@ -524,6 +505,9 @@ public class KeySprint {
             lastLine = line;
             lastLineWidth = lineW;
         }
+        // totalLines covers the full word list; bodyRows is the fixed visible
+        // window. Keep the active line visible with one line of
+        // context above it, and stop scrolling at the end of the word list.
         totalLines = line + 1;
 
         if (cursor < picked.size()) {
@@ -635,15 +619,6 @@ public class KeySprint {
             if (waitingForSize) continue;
 
             if (state == State.PLAYING) topUpWords();
-
-            if (state == State.PLAYING && config.mode == Config.Mode.WORDS) {
-                int lines = wrappedLineCount();
-                if (lines > bodyRows) {
-                    setBodyRows(lines);
-                    relayout();
-                    if (waitingForSize) continue;
-                }
-            }
 
             if (dirty) {
                 if (headerDirty) {
@@ -823,11 +798,6 @@ public class KeySprint {
                 : (config.difficulty == 0 ? 80 : 70);
         picked = pickWords(count, null);
         resetTyped();
-        if (config.mode == Config.Mode.WORDS) {
-            setBodyRows(Math.max(BASE_BODY_ROWS, wrappedLineCount()));
-        } else {
-            setBodyRows(BASE_BODY_ROWS);
-        }
         headerDirty = true;
         out.print("\033[?25h"); // Show cursor.
         relayout();
@@ -844,7 +814,6 @@ public class KeySprint {
 
     private void returnToMenu() {
         state = State.MENU;
-        setBodyRows(BASE_BODY_ROWS);
         cancelEditor();
         refreshPreview();
         out.print("\033[?25l");
@@ -888,7 +857,6 @@ public class KeySprint {
         completed = true;
         endNanos = System.nanoTime();
         state = State.RESULTS;
-        setBodyRows(BASE_BODY_ROWS);
         relayout();
     }
 

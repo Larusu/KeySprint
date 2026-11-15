@@ -8,26 +8,39 @@ in-progress
 
 Requires JDK 17 or newer. The JLine jar is bundled in `java/`.
 
-### VS Code setup
-
-Open the project root (`KeySprint/`) in VS Code. The checked-in
-`.vscode/settings.json` sets `java/` as the Java source folder and adds the
-bundled JLine jar to the project's referenced libraries. This lets VS Code
-resolve `org.jline` imports and types such as `Terminal`.
-
-If those errors remain after opening the project, run **Java: Clean Java
-Language Server Workspace** from the Command Palette and let VS Code reload.
-
 ### Build and run
 
-Requires a JDK on your `PATH` (check with `javac -version`).
+With JDK 17 or newer and GNU Make on your `PATH`, run from the project root:
+
+```bash
+make -C java run
+```
+
+From inside `java/`, use `make run`. This compiles all Java source files and
+adds the bundled JLine library when compiling and running. The Makefile uses
+the compiler module from the JDK selected by `java`, so a separate `javac`
+executable on `PATH` is not needed.
+
+Build without starting the game, or use an explicit word-bank path:
+
+```bash
+make -C java
+make -C java run ARGS="../data/words.json"
+```
+
+`java KeySprint.java` does not include JLine. On JDK 17–21, this command also
+does not compile the other source files. VS Code's library settings apply
+only inside the editor; terminal commands must include the dependencies too.
+
+To build and run without Make, use the following commands with `javac` on
+your `PATH`:
 
 **Windows (PowerShell or cmd):**
 
 ```powershell
 cd java
 javac -cp ".;jline-3.26.3.jar" *.java
-java -cp ".;jline-3.26.3.jar" KeySprint
+java --enable-native-access=ALL-UNNAMED -cp ".;jline-3.26.3.jar" KeySprint
 ```
 
 
@@ -37,7 +50,7 @@ java -cp ".;jline-3.26.3.jar" KeySprint
 ```bash
 cd java
 javac -cp ".:jline-3.26.3.jar" *.java
-java -cp ".:jline-3.26.3.jar" KeySprint
+java --enable-native-access=ALL-UNNAMED -cp ".:jline-3.26.3.jar" KeySprint
 ```
 
 The only difference is the classpath separator: `;` on Windows, `:` on
@@ -49,6 +62,12 @@ from `java/`, or `data/words.json` when run from the project root. Pass an
 explicit path as the first argument if needed.
 
 ### Clean build files
+
+With Make:
+
+```bash
+make -C java clean
+```
 
 From the project root:
 
@@ -68,6 +87,10 @@ rm java/*.class
 - `Enter` selects a value or starts the game.
 - Modes: Time (`15/30/60/120` seconds) and Words (`10/25/50/75`).
 - In Words mode, the `custom` preset opens a 1–10,000 word-count editor.
+- The box keeps its original size with four visible rows of wrapped words.
+  As you type, the text scrolls to follow the active line, keeping one previous
+  line visible. The minimum terminal size is 78 columns by 11 rows for every
+  word count.
 - The timer starts on the first letter or digit you type.
 - During a game, `Esc` returns to the menu; `Ctrl+C` exits.
 - On the results screen, `Esc` returns to the menu and `Ctrl+C` exits; other
