@@ -1,4 +1,5 @@
 keysprint
+.freebuff
 .venv/
 __pycache__/
 *.pyc
