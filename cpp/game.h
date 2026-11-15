@@ -2,6 +2,8 @@
 
 #include <chrono>
 #include <optional>
+#include <string>
+#include <vector>
 #include "config.h"
 
 using Clock = std::chrono::steady_clock;
@@ -16,15 +18,17 @@ struct Stats {
 };
 
 struct Game {                       // mutable per game
+    const std::vector<std::string>* pool = nullptr;  // word bank, owned elsewhere
     std::vector<std::string> words; // picked for this run
     std::vector<std::string> typed; // typed[i] = what the player typed for words[i]
     size_t cursor = 0;
+    size_t last_index = 0;          // pool index of words.back()
     std::optional<Clock::time_point> start;
     Stats keystrokes;
 };
 
 void top_up_words(Game& game, const Config& config);
-Game new_game(const Config& config);
+Game new_game(const Config& config, const std::vector<std::string>& pool);
 void apply_key(Game& game, char ch);
 bool is_over(const Game& game, const Config& config);
 double elapsed(const Game& g);

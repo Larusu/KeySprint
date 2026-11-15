@@ -1,62 +1,48 @@
 #pragma once
 
 #include <cstddef>
-#include <stdexcept>
+#include <iterator>
 #include <string>
 #include <string_view>
-#include <vector>
 
 enum class Difficulty { English1k, English5k, English10k, English25k };
 enum class Mode { Time, Words };
 
-constexpr std::string_view difficulty_key(Difficulty difficulty)
-{
-    switch (difficulty)
-    {
-        case Difficulty::English1k:  return "english_1k";
-        case Difficulty::English5k:  return "english_5k";
-        case Difficulty::English10k: return "english_10k";
-        case Difficulty::English25k: return "english_25k";
-    }
-    throw std::invalid_argument("Unknown difficulty");
-}
-
-constexpr std::string_view to_string(Difficulty difficulty)
-{
-    switch (difficulty)
-    {
-        case Difficulty::English1k:  return "English 1k";
-        case Difficulty::English5k:  return "English 5k";
-        case Difficulty::English10k: return "English 10k";
-        case Difficulty::English25k: return "English 25k";
-    }
-    return "Unknown";
-}
-
-constexpr std::string_view to_string(Mode mode)
-{
-    return mode == Mode::Time ? "Time" : "Words";
-}
-
-inline constexpr Mode ALL_MODES[] = { Mode::Time, Mode::Words };
-inline constexpr Difficulty ALL_DIFFICULTIES[] = {
-    Difficulty::English1k, Difficulty::English5k,
-    Difficulty::English10k, Difficulty::English25k
+struct DifficultyInfo {
+    std::string_view key;    // word bank / JSON key
+    std::string_view title;  // "English 1k"
+    std::string_view label;  // "1k", for the selector row
 };
+
+// Indexed by Difficulty, so the order must match the enum.
+inline constexpr DifficultyInfo DIFFICULTIES[] = {
+    { "english_1k",  "English 1k",  "1k"  },
+    { "english_5k",  "English 5k",  "5k"  },
+    { "english_10k", "English 10k", "10k" },
+    { "english_25k", "English 25k", "25k" },
+};
+inline constexpr std::size_t DIFFICULTY_COUNT = std::size(DIFFICULTIES);
+static_assert(DIFFICULTY_COUNT == std::size_t(Difficulty::English25k) + 1,
+              "DIFFICULTIES must match the Difficulty enum");
+
+constexpr const DifficultyInfo& difficulty_info(Difficulty d)
+{
+    return DIFFICULTIES[std::size_t(d)];
+}
+
 inline constexpr int TIME_OPTIONS[] = { 15, 30, 60, 120 };
 inline constexpr int WORD_OPTIONS[] = { 10, 25, 50, 75 };
 inline constexpr int MAX_WORD_COUNT = 10000;
 
 struct Config {
-    Mode mode = Mode::Time;
+    Mode       mode       = Mode::Time;
     Difficulty difficulty = Difficulty::English1k;
-    int time_limit = 30; // Time mode only
-    int word_count = 25; // Words mode only
-    std::vector<std::string> word_list; // selected pool, copied from the startup cache
+    int        time_limit = 30;  // Time mode only
+    int        word_count = 25;  // Words mode only
 };
 
 struct ConfigEditor {
-    bool editing_count = false;
+    bool        editing_count = false;
     std::string count_input;
     std::string error;
 };

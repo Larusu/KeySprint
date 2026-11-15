@@ -2,13 +2,13 @@
 
 namespace {
 
-template <typename T, std::size_t N>
-T step(const T (&values)[N], T current, int direction)
+// Next/previous preset. A custom count that isn't a preset jumps to either end
+template <std::size_t N>
+int step(const int (&values)[N], int current, int direction)
 {
     for (std::size_t i = 0; i < N; ++i)
         if (values[i] == current)
             return values[(i + N + (direction < 0 ? N - 1 : 1)) % N];
-    // A custom count is visiting from outside the preset carousel.
     return direction < 0 ? values[N - 1] : values[0];
 }
 
@@ -18,8 +18,15 @@ void adjust_config(Config& config, std::size_t focus, int direction)
 {
     switch (focus)
     {
-        case 0: config.mode = step(ALL_MODES, config.mode, direction); break;
-        case 1: config.difficulty = step(ALL_DIFFICULTIES, config.difficulty, direction); break;
+        case 0:  // only two modes, so either direction just toggles
+            config.mode = config.mode == Mode::Time ? Mode::Words : Mode::Time;
+            break;
+        case 1:
+        {
+            const int n = int(DIFFICULTY_COUNT);
+            config.difficulty = Difficulty((int(config.difficulty) + direction + n) % n);
+            break;
+        }
         case 2:
             if (config.mode == Mode::Time)
                 config.time_limit = step(TIME_OPTIONS, config.time_limit, direction);
@@ -35,7 +42,7 @@ void handle_config_key(Config& config, ConfigEditor& editor, char ch)
     {
         if (ch >= '0' && ch <= '9')
         {
-            if (editor.count_input.size() < 20)
+            if (editor.count_input.size() < 5)   // MAX_WORD_COUNT has 5 digits
                 editor.count_input += ch;
         }
         else if (ch == 127 || ch == 8)
@@ -48,21 +55,12 @@ void handle_config_key(Config& config, ConfigEditor& editor, char ch)
         return;
     }
 
-    switch (ch)
+    if (const int pick = ch - '1'; pick >= 0 && pick < int(DIFFICULTY_COUNT))
+        config.difficulty = Difficulty(pick);
+    else if ((ch == 'w' || ch == 'W') && config.mode == Mode::Words)
     {
-        case '1': config.difficulty = Difficulty::English1k; break;
-        case '2': config.difficulty = Difficulty::English5k; break;
-        case '3': config.difficulty = Difficulty::English10k; break;
-        case '4': config.difficulty = Difficulty::English25k; break;
-        case 'w':
-        case 'W':
-            if (config.mode == Mode::Words)
-            {
-                editor.editing_count = true;
-                editor.count_input.clear();
-                editor.error.clear();
-            }
-            break;
+        editor = {};
+        editor.editing_count = true;
     }
 }
 
@@ -76,30 +74,14 @@ bool commit_word_count(Config& config, ConfigEditor& editor)
         return false;
     }
 
-    int value = 0;
-    for (char ch : editor.count_input)
-    {
-        if (ch < '0' || ch > '9')
-        {
-            editor.error = "Word count must contain digits only";
-            return false;
-        }
-        // Stop before multiplying: even a mountain of digits cannot overflow.
-        const int digit = ch - '0';
-        if (value > (MAX_WORD_COUNT - digit) / 10)
-        {
-            editor.error = "Word count must be between 1 and 10,000";
-            return false;
-        }
-        value = value * 10 + digit;
-    }
-    if (value == 0)
+    const int value = std::stoi(editor.count_input);   // at most 5 digits, can't overflow
+    if (value < 1 || value > MAX_WORD_COUNT)
     {
         editor.error = "Word count must be between 1 and 10,000";
         return false;
     }
 
     config.word_count = value;
-    editor = ConfigEditor{};
+    editor = {};
     return true;
 }

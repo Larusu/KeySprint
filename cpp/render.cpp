@@ -22,12 +22,6 @@ constexpr int SELECTOR_GAP      = 1;
 // fixed weight so the bar doesn't resize when the mode changes
 constexpr int OPTION_WEIGHT     = 3 * 4;
 
-// results screen
-constexpr int RESULT_ROWS         = 6;
-constexpr int RESULT_BOX_HEIGHT   = RESULT_ROWS + 2 + 2 * PADDING_Y;
-constexpr int RESULT_TOTAL_HEIGHT = 1 + RESULT_BOX_HEIGHT + 2; // header + box + blank + footer
-static_assert(RESULT_ROWS <= VISIBLE_LINES, "results don't fit in the box");
-
 // smallest terminal we can draw in
 constexpr int MIN_COLS = BOX_WIDTH;
 constexpr int MIN_ROWS = TOTAL_HEIGHT + 2;
@@ -164,50 +158,17 @@ Position notice_size{0, 0}; // terminal size when the "too small" message was dr
 
 // ---------- text ----------
 
-struct Glyph {
-    char ch;
-    Style style;
-};
-using Line = std::vector<Glyph>;
+struct Line { size_t first, last; }; // words [first, last) share one line
 
 struct Layout {
     std::vector<Line> lines;
     size_t cursor_line = 0;
 };
 
-// Typed bytes can be anything (control codes, half of a UTF-8 character...).
-// Show those as '?' so they can't break the picture.
 char printable(char c)
 {
     const unsigned char u = static_cast<unsigned char>(c);
     return (u >= 0x20 && u < 0x7F) ? c : '?';
-}
-
-void append_word(Line& line, const std::string& target, const std::string& typed, bool already_passed)
-{
-    const size_t max_len = std::max(target.size(), typed.size());
-
-    for(size_t j = 0; j < max_len; j++)
-    {
-        Style style = Style::White;
-        char shown;
-        if(j >= target.size()) // extra char
-        {
-            style = Style::Red;
-            shown = typed[j];
-        }
-        else if(j < typed.size())
-        {  // correct or incorrect
-            style = (target[j] == typed[j]) ? Style::Green : Style::Red;
-            shown = target[j];
-        }
-        else
-        {  // skipped or not typed yet
-            style = already_passed ? Style::Red : Style::White;
-            shown = target[j];
-        }
-        line.push_back({printable(shown), style});
-    }
 }
 
 std::string repeat(const char* s, int n)
@@ -231,46 +192,52 @@ void draw_box(Screen& screen, int row, int col, int width, int height)
     put(screen, {row + height - 1, col}, "╰" + repeat("─", width - 2) + "╯");
 }
 
+size_t word_width(const Game& g, size_t i)
+{ return std::max(g.words[i].size(), g.typed[i].size()); }
+
 Layout layout(const Game& game, size_t max_width)
 {
     Layout out;
-    Line line;
-    size_t line_width = 0;
+    size_t first = 0;    // the line being built holds words [first, i)
+    size_t width = 0;
 
-    for(size_t i = 0; i < game.words.size(); i++)
+    for (size_t i = 0; i < game.words.size(); i++)
     {
-        const std::string& typed  = game.typed[i];
-        const std::string& target = game.words[i];
-        const size_t word_width = std::max(target.size(), typed.size());
-
-        size_t needed = line_width == 0 ? word_width
-                                        : line_width + 1 + word_width;
-        if (needed > max_width && !line.empty())
+        const size_t w = word_width(game, i);
+        if (i > first && width + 1 + w > max_width)      // doesn't fit: close the line
         {
-            out.lines.push_back(line);
+            out.lines.push_back({first, i});
             if (i > game.cursor && out.lines.size() > out.cursor_line + VISIBLE_LINES)
-                return out;
-            line.clear();
-            line_width = 0;
+                return out;                              // enough lines below the cursor
+            first = i;
         }
-
-        if (line_width > 0) { line.push_back({' ', Style::Normal}); line_width++; }
-
-        if(i == game.cursor)
+        width = (i == first) ? w : width + 1 + w;
+        if (i == game.cursor)
             out.cursor_line = out.lines.size();
-
-        bool already_passed = i < game.cursor;
-        append_word(line, target, typed, already_passed);
-        line_width += word_width;
     }
-
-    if(!line.empty())
-        out.lines.push_back(line);
-
-    if(game.cursor >= game.words.size() && !out.lines.empty())
+    if (first < game.words.size())
+        out.lines.push_back({first, game.words.size()});
+    if (game.cursor >= game.words.size() && !out.lines.empty())
         out.cursor_line = out.lines.size() - 1;
-
     return out;
+}
+
+// Draws one word at (row, col), clipped at end_col. Returns the column after it.
+int draw_word(Screen& screen, int row, int col, int end_col,
+              const std::string& target, const std::string& typed, bool passed)
+{
+    const size_t len = std::max(target.size(), typed.size());
+    for (size_t j = 0; j < len && col < end_col; j++, col++)
+    {
+        Style style;
+        if (j >= target.size())     style = Style::Red;                         // extra
+        else if (j < typed.size())  style = target[j] == typed[j] ? Style::Green : Style::Red;
+        else                        style = passed ? Style::Red : Style::White; // skipped / not typed yet
+
+        const char shown = printable(j < target.size() ? target[j] : typed[j]);
+        put(screen, {row, col}, std::string_view(&shown, 1), style);
+    }
+    return col;
 }
 
 Position box_origin(Position size)
@@ -324,28 +291,33 @@ size_t fill_options(const T (&values)[N], T current, std::vector<std::string>& o
     return selected;
 }
 
+// Carousel of presets. A custom word count that isn't a preset is shown alone.
+template <size_t N>
+Selector preset_selector(const int (&values)[N], int current)
+{
+    Selector s{ {}, N, OPTION_WEIGHT };               // selected == N means "not found yet"
+    for (size_t i = 0; i < N; i++)
+    {
+        s.options.push_back(std::to_string(values[i]));
+        if (values[i] == current)
+            s.selected = i;
+    }
+    if (s.selected == N)
+        s = { { std::to_string(current) }, 0, OPTION_WEIGHT };
+    return s;
+}
+
 std::vector<Selector> make_selectors(const Config& c)
 {
-    std::vector<std::string> options_list;
-    size_t selected_index;
-
-    if(c.mode == Mode::Words)
-        selected_index = fill_options(WORD_OPTIONS, static_cast<int>(c.word_count), options_list);
-    else
-        selected_index = fill_options(TIME_OPTIONS, c.time_limit, options_list);
-
-    if (c.mode == Mode::Words
-        && std::find(std::begin(WORD_OPTIONS), std::end(WORD_OPTIONS), c.word_count)
-            == std::end(WORD_OPTIONS))
-    {
-        options_list = { std::to_string(c.word_count) };
-        selected_index = 0; // The custom number gets its own honest label.
-    }
+    Selector difficulty{ {}, size_t(c.difficulty) };
+    for (const DifficultyInfo& d : DIFFICULTIES)
+        difficulty.options.emplace_back(d.label);
 
     return {
-        { {"Time", "Words"}, static_cast<size_t>(c.mode) },
-        { {"1k", "5k", "10k", "25k"}, static_cast<size_t>(c.difficulty) },
-        { options_list, selected_index, OPTION_WEIGHT }
+        { {"Time", "Words"}, size_t(c.mode) },
+        difficulty,
+        c.mode == Mode::Time ? preset_selector(TIME_OPTIONS, c.time_limit)
+                             : preset_selector(WORD_OPTIONS, c.word_count),
     };
 }
 
@@ -445,22 +417,15 @@ void draw_text(Screen& screen, Position box, const Game& g)
     else
         first = 0;
 
-    const int text_row   = box.row + 1 + PADDING_Y;
-    const int text_col   = box.col + 1 + PADDING_X;
-    for(int i = 0; i < VISIBLE_LINES; i++)
+    const int text_row = box.row + 1 + PADDING_Y;
+    const int text_col = box.col + 1 + PADDING_X;
+    for (int i = 0; i < VISIBLE_LINES && first + size_t(i) < lay.lines.size(); i++)
     {
-        const size_t idx = first + size_t(i);
-        if(idx >= lay.lines.size())
-            break;
-
-        int x = 0;
-        for(const Glyph& glyph : lay.lines[idx])
-        {
-            if(x >= text_width) // a very long word must not run over the border
-                break;
-            put(screen, {text_row + i, text_col + x}, std::string_view(&glyph.ch, 1), glyph.style);
-            x++;
-        }
+        const Line& line = lay.lines[first + size_t(i)];
+        int col = text_col;
+        for (size_t w = line.first; w < line.last; w++)
+            col = draw_word(screen, text_row + i, col, text_col + text_width,
+                            g.words[w], g.typed[w], w < g.cursor) + 1;   // +1 = the space
     }
 }
 
@@ -504,81 +469,83 @@ void draw_config(Screen& screen, const Game& g, const Config& c,
 }
 
 // ---------- footer ----------
-void draw_ctrl(Screen& screen, int row, int center_col,
-               std::string_view key, std::string_view label)
+struct Hint { std::string_view key, label; };
+
+// Spaces the hints evenly: hint i of n is centered at (2i+1)/(2n) of the box width.
+void draw_hints(Screen& screen, Position box, int row, std::initializer_list<Hint> hints)
 {
-    const int width = int(key.size()) + 1 + int(label.size());
-    const int col   = center_col - width / 2;
-    put(screen, {row, col}, key, Style::Green);
-    put(screen, {row, col + int(key.size()) + 1}, label);
+    const int n = int(hints.size());
+    int i = 0;
+    for (const Hint& h : hints)
+    {
+        const int center = box.col + BOX_WIDTH * (2 * i++ + 1) / (2 * n);
+        const int col    = center - (int(h.key.size()) + 1 + int(h.label.size())) / 2;
+        put(screen, {row, col}, h.key, Style::Green);
+        put(screen, {row, col + int(h.key.size()) + 1}, h.label);
+    }
 }
 
-void draw_footer(Screen& screen, Position box, const Game& g, const Config& c, const State& s)
+void draw_footer(Screen& screen, Position box, const Game& g, const Config& c, State s)
 {
-    const int row = box.row + BOX_HEIGHT + 1; // 2 rows below the box
+    const int row = box.row + BOX_HEIGHT + 1;          // 2 rows below the box
 
-    if(s == State::Playing && !g.start.has_value())
+    switch (s)
     {
-        draw_ctrl(screen, row, box.col + BOX_WIDTH * 1 / 6, "ctrl+n", "new game");
-        draw_ctrl(screen, row, box.col + BOX_WIDTH * 3 / 6, "ctrl+f", "config");
-        draw_ctrl(screen, row, box.col + BOX_WIDTH * 5 / 6, "ctrl+c", "exit");
-    }
-    else if(s == State::Playing && g.start.has_value())
-    {
-        draw_ctrl(screen, row, box.col + BOX_WIDTH * 1 / 2, "esc", "restart");
-    }
-    else if(s == State::Config)
-    {
-        draw_ctrl(screen, row, box.col + BOX_WIDTH * 1 / 6, "tab",  "new section");
-        draw_ctrl(screen, row, box.col + BOX_WIDTH * 3 / 6, "</>",  "left/right");
-        draw_ctrl(screen, row, box.col + BOX_WIDTH * 5 / 6, "esc",  "back");
-        
-        if(c.mode == Mode::Words)
+        case State::Playing:
+            if (g.start)
+                draw_hints(screen, box, row, {{"esc", "restart"}});
+            else
+                draw_hints(screen, box, row, {{"ctrl+n", "new game"}, {"ctrl+f", "config"},
+                                              {"ctrl+c", "exit"}});
+            break;
+        case State::Config:
         {
-
-            draw_ctrl(screen, std::min(row + 2, screen.rows), box.col + BOX_WIDTH * 1 / 4, "1-4", "difficulty");
-            draw_ctrl(screen, std::min(row + 2, screen.rows), box.col + BOX_WIDTH * 3 / 4, "w", "word count");
+            draw_hints(screen, box, row, {{"tab", "new section"}, {"</>", "left/right"},
+                                          {"esc", "back"}});
+            const int row2 = std::min(row + 2, screen.rows);
+            if (c.mode == Mode::Words)
+                draw_hints(screen, box, row2, {{"1-4", "difficulty"}, {"w", "word count"}});
+            else
+                draw_hints(screen, box, row2, {{"1-4", "difficulty"}});
+            break;
         }
-        else
-            draw_ctrl(screen, std::min(row + 2, screen.rows), box.col + BOX_WIDTH / 2, "1-4", "difficulty");
-    }
-    else if(s == State::Results)
-    {
-        draw_ctrl(screen, row, box.col + BOX_WIDTH * 1 / 4, "ctrl+n", "new game");
-        draw_ctrl(screen, row, box.col + BOX_WIDTH * 3 / 4, "ctrl+c", "exit");
+        case State::Results:
+            draw_hints(screen, box, row, {{"ctrl+n", "new game"}, {"ctrl+c", "exit"}});
+            break;
+        case State::Exit:
+            break;
     }
 }
-
 // ---------- result ----------
-void draw_stat(Screen& screen, int row, int mid_col,
-               std::string_view label, const std::string& value)
-{
-    put(screen, {row, mid_col - int(label.size()) - 1}, std::string(label) + ":");
-    put(screen, {row, mid_col + 2}, value, Style::Green);
-}
-
 void draw_results(Screen& screen, const Result& r, Position size)
 {
     const Position box = box_origin(size);
     draw_box(screen, box.row, box.col, BOX_WIDTH, BOX_HEIGHT);
 
-    // header
-    const std::string header = std::string(to_string(r.difficulty)) + "      "
+    const std::string header = std::string(difficulty_info(r.difficulty).title) + "      "
                              + std::to_string(std::lround(r.duration)) + "s      "
                              + r.date.substr(0, 10);
     put(screen, {box.row - BAR_HEIGHT + 1,
                  box.col + (BOX_WIDTH - int(header.size())) / 2}, header);
 
+    const std::pair<std::string_view, std::string> stats[] = {
+        {"wpm:",       std::to_string(std::lround(r.wpm))},
+        {"accuracy:",  std::to_string(std::lround(r.accuracy)) + "%"},
+        {"correct:",   std::to_string(r.chars.correct)},
+        {"incorrect:", std::to_string(r.chars.incorrect)},
+        {"extra:",     std::to_string(r.chars.extra)},
+        {"missed:",    std::to_string(r.chars.missed)},
+    };
+
     const int mid = box.col + BOX_WIDTH / 2;
     int row = box.row + 1 + PADDING_Y;
-    draw_stat(screen, row++, mid, "wpm",       std::to_string(std::lround(r.wpm)));
-    draw_stat(screen, row++, mid, "accuracy",  std::to_string(std::lround(r.accuracy)) + "%");
-    draw_stat(screen, row++, mid, "correct",   std::to_string(r.chars.correct));
-    draw_stat(screen, row++, mid, "incorrect", std::to_string(r.chars.incorrect));
-    draw_stat(screen, row++, mid, "extra",     std::to_string(r.chars.extra));
-    draw_stat(screen, row++, mid, "missed",    std::to_string(r.chars.missed));
+    for (const auto& [label, value] : stats)
+    {
+        put(screen, {row, mid - int(label.size())}, label);   // the label includes its colon
+        put(screen, {row, mid + 2}, value, Style::Green);
+        row++;
+    }
 }
-
 }
 
 void render(const Game& g, const Config& c, const State& s, const Result& r, size_t focus, const ConfigEditor& editor)

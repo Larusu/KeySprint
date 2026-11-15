@@ -16,6 +16,8 @@ namespace {
 
 constexpr int FPS = 60;
 constexpr std::chrono::milliseconds FRAME_TIME(1000 / FPS);
+constexpr size_t CONFIG_ROWS = 3; // mode, difficulty, time/words
+const Result NO_RESULT{};         // passed to render before a game ends
 
 struct App {
     WordBank word_bank;
@@ -53,10 +55,72 @@ std::string find_word_bank(int argc, char** argv)
 
 void restart(App& app)
 {
-    app.config.word_list = get_word_list(app.word_bank, difficulty_key(app.config.difficulty));
-    app.game = new_game(app.config);
+    app.game = new_game(app.config,
+               get_word_list(app.word_bank, difficulty_info(app.config.difficulty).key));
     app.result.reset();
-    // Keep the screen we're on: changing a selector is still a config preview.
+}
+
+void start(App& app)
+{
+    restart(app);
+    app.state = State::Playing;
+}
+
+void handle_playing(App& app, int key, bool is_char)
+{
+    if (key == KEY_ESC)
+        start(app);
+    else if (is_char && !is_over(app.game, app.config))
+        apply_key(app.game, static_cast<char>(key));
+}
+
+void handle_results(App& app, int key)
+{
+    if (key == KEY_ESC)
+        start(app);
+}
+
+void handle_config(App& app, int key, bool is_char)
+{
+    Config& config = app.config;
+    ConfigEditor& editor = app.config_editor;
+
+    if (editor.editing_count)
+    {
+        if (key == KEY_ESC)
+            editor = {};                                  // draft goes in the bin
+        else if (key == ctrl('f'))
+        {
+            if (commit_word_count(config, editor))
+                start(app);
+        }
+        else if (is_char)
+        {
+            handle_config_key(config, editor, static_cast<char>(key));
+            if (!editor.editing_count)                    // Enter committed the count
+                restart(app);
+        }
+        return;
+    }
+
+    if (key == '\t')
+        app.config_focus = (app.config_focus + 1) % CONFIG_ROWS;
+    else if (key == KEY_SHIFT_TAB)
+        app.config_focus = (app.config_focus + CONFIG_ROWS - 1) % CONFIG_ROWS;
+    else if (key == KEY_LEFT || key == KEY_RIGHT)
+    {
+        adjust_config(config, app.config_focus, key == KEY_LEFT ? -1 : 1);
+        restart(app);
+    }
+    else if (key == KEY_ESC || key == ctrl('f') || key == '\r' || key == '\n')
+        app.state = State::Playing;
+    else if (is_char)
+    {
+        const auto before = config.difficulty;
+        handle_config_key(config, editor, static_cast<char>(key));
+        if (before != config.difficulty)
+            restart(app);
+    }
 }
 
 void handle_key(App& app, int key)
@@ -70,85 +134,30 @@ void handle_key(App& app, int key)
     }
 
     const bool in_game = app.state == State::Playing && app.game.start.has_value();
-
-    if (key == ctrl('f') && app.state != State::Config && !in_game)
+    if (!in_game)
     {
-        app.config_editor = ConfigEditor{};
-        restart(app); // Abandon the old timer before showing the new preview.
-        app.state = State::Config;
-        return;
-    }
-    if (key == ctrl('n') && !in_game)
-    {
-        if (!commit_word_count(app.config, app.config_editor))
+        if (key == ctrl('f') && app.state != State::Config)
+        {
+            app.config_editor = {};
+            restart(app); // abandon the old timer before showing the preview
+            app.state = State::Config;
             return;
-        restart(app);
-        app.state = State::Playing;
-        return;
+        }
+        if (key == ctrl('n'))
+        {
+            if (commit_word_count(app.config, app.config_editor))
+                start(app);
+            return;
+        }
     }
 
+    const bool is_char = key >= 0 && key < 256;
     switch (app.state)
     {
-        case State::Playing:
-            if (key == KEY_ESC)
-                restart(app);
-            else if (key >= 0 && key < 256 && !is_over(app.game, app.config))
-            {
-                apply_key(app.game, static_cast<char>(key));
-                top_up_words(app.game, app.config);
-            }
-            break;
-        case State::Config:
-        {
-            if (app.config_editor.editing_count)
-            {
-                if (key == KEY_ESC)
-                    app.config_editor = ConfigEditor{}; // Draft goes in the bin.
-                else if (key == ctrl('f'))
-                {
-                    if (commit_word_count(app.config, app.config_editor))
-                    {
-                        restart(app);
-                        app.state = State::Playing;
-                    }
-                }
-                else if (key >= 0 && key < 256)
-                {
-                    handle_config_key(app.config, app.config_editor, static_cast<char>(key));
-                    if (!app.config_editor.editing_count)
-                        restart(app);
-                }
-                break;
-            }
-            if (key == '\t')
-                app.config_focus = (app.config_focus + 1) % 3;
-            else if (key == KEY_SHIFT_TAB)
-                app.config_focus = (app.config_focus + 2) % 3;
-            else if (key == KEY_LEFT || key == KEY_RIGHT)
-            {
-                adjust_config(app.config, app.config_focus, key == KEY_LEFT ? -1 : 1);
-                restart(app);
-            }
-            else if (key == KEY_ESC || key == ctrl('f') || key == '\r' || key == '\n')
-                app.state = State::Playing;
-            else if (key >= 0 && key < 256)
-            {
-                const auto before = app.config.difficulty;
-                handle_config_key(app.config, app.config_editor, static_cast<char>(key));
-                if (before != app.config.difficulty)
-                    restart(app);
-            }
-            break;
-        }
-        case State::Results:
-            if (key == KEY_ESC)
-            {
-                restart(app);
-                app.state = State::Playing;
-            }
-            break;
-        case State::Exit:
-            break;
+        case State::Playing: handle_playing(app, key, is_char); break;
+        case State::Config:  handle_config(app, key, is_char);  break;
+        case State::Results: handle_results(app, key);          break;
+        case State::Exit:    break;
     }
 }
 
@@ -196,8 +205,10 @@ int main(int argc, char** argv)
             handle_input(app);
             update(app);
             if (app.state != State::Exit)
-                render(app.game, app.config, app.state, app.result.value_or(Result{}),
-                       app.config_focus, app.config_editor);
+            {
+                const Result& result = app.result ? *app.result : NO_RESULT;
+                render(app.game, app.config, app.state, result, app.config_focus, app.config_editor);
+            }
             std::this_thread::sleep_until(frame_end);
         }
     }
