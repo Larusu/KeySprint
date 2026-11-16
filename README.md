@@ -6,21 +6,45 @@ Requires **Python 3.10 or newer** and the Textual library.
 
 ### Setup and run
 
-From the project root, navigate to the Python directory:
+**POSIX (macOS / Linux)**
+
+From the project root:
 
 ```bash
 cd python
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install textual
+python3 main.py
 ```
 
-Install Textual:
+**Windows (PowerShell)**
 
-```bash
-pip install textual
+From the project root:
+
+```powershell
+cd python
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install textual
+python main.py
 ```
 
-Run the game:
+### Running after setup
+
+**POSIX (macOS / Linux)**
 
 ```bash
+cd python
+source .venv/bin/activate
+python3 main.py
+```
+
+**Windows (PowerShell)**
+
+```powershell
+cd python
+.venv\Scripts\activate
 python main.py
 ```
 
