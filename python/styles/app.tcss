@@ -5,13 +5,30 @@ Screen {
 #game-layout {
     width: 100%;
     height: 100%;
+    align: center middle;
+}
+
+#config-panel-wrapper {
+    width: 100%;
+    height: 100%;
+    align: center middle;
+    display: none;
+}
+
+#config-panel {
+    width: 46;
+    height: auto;
+    background: #211E1E;
+    border: round #753FEB;
+    padding: 1 2;
+    align: center middle;
 }
 
 #top-controls-wrapper {
     width: 100%;
     height: 3;
     align: center middle;
-    margin: 15 0 5 0;
+    margin: 0 0 5 0;
 }
 
 #selected-time {
@@ -41,8 +58,9 @@ Screen {
     margin: 0 1;
 }
 
-#difficulty,
-#timer {
+/* Timer and Words labels */
+#timer-mode,
+#words-mode {
     color: #FFFFFF;
     background: transparent;
     padding: 0 2;
@@ -52,6 +70,7 @@ Screen {
     text-style: bold;
 }
 
+/* Difficulty, Timer, Words options */
 #difficulty-option1,
 #difficulty-option2,
 #difficulty-option3,
@@ -59,7 +78,8 @@ Screen {
 #timer-option1,
 #timer-option2,
 #timer-option3,
-#timer-option4 {
+#timer-option4,
+#timer-option-custom {
     color: #FFFFFF;
     background: transparent;
     padding: 0 2;
@@ -69,9 +89,24 @@ Screen {
     text-style: bold;
 }
 
+/* Selected states */
+#difficulty-option1.selected-option,
+#difficulty-option2.selected-option,
+#difficulty-option3.selected-option,
+#difficulty-option4.selected-option,
+#timer-option1.selected-option,
+#timer-option2.selected-option,
+#timer-option3.selected-option,
+#timer-option4.selected-option,
+#timer-option-custom.selected-option,
+#timer-mode.selected-option,
+#words-mode.selected-option {
+    color: #753FEB;
+}
+
 #typing-wrapper {
     width: 100%;
-    height: 10%;
+    height: auto;
     align: center middle;
 }
 
@@ -93,7 +128,15 @@ Screen {
     width: 100%;
     height: 3;
     align: center middle;
-    margin: 5 0;
+    margin: 5 0 0 0;
+}
+
+#bottom-controls Static {
+    color: #FFFFFF;
+    width: auto;
+    height: 3;
+    padding: 0 2;
+    content-align: center middle;
 }
 
 #restart,
@@ -102,4 +145,164 @@ Screen {
     width: auto;
     padding: 0 2;
     height: 3;
+}
+
+#results-layout {
+    width: 100%;
+    height: 100%;
+    align: center middle;
+}
+
+#results-title {
+    width: 100%;
+    text-align: center;
+    color: #FFFFFF;
+    text-style: bold;
+    margin-bottom: 2;
+}
+
+#results-content {
+    width: 100%;
+    height: auto;
+    align: center middle;
+}
+
+#main-stats {
+    width: 42;
+    height: 7;
+    align: center middle;
+    margin-bottom: 2;
+}
+
+.stat-card {
+    width: 18;
+    height: 7;
+    background: #211E1E;
+    border: round #753FEB;
+    align: center middle;
+    margin: 0 1;
+}
+
+.stat-label {
+    width: 100%;
+    color: #AAAAAA;
+    text-style: bold;
+    content-align: center middle;
+    margin-bottom: 1;
+}
+
+.stat-value {
+    width: 100%;
+    color: #753FEB;
+    text-style: bold;
+    content-align: center middle;
+}
+
+#character-stats {
+    width: 42;
+    height: auto;
+    background: #211E1E;
+    padding: 1 2;
+    border: round #444444;
+}
+
+.result-row {
+    width: 100%;
+    height: 3;
+    align: center middle;
+}
+
+.result-row Static:first-child {
+    width: 1fr;
+    color: #FFFFFF;
+}
+
+.result-row Static:last-child {
+    width: auto;
+    color: #753FEB;
+    text-style: bold;
+}
+
+#results-controls {
+    width: 42;
+    height: 3;
+    margin-top: 2;
+    align: center middle;
+}
+
+#results-controls Static {
+    color: #FFFFFF;
+    padding: 0 2;
+}
+
+
+/* ==============================
+   CONFIGURATION PANEL
+============================== */
+
+#config-title {
+    width: 100%;
+    height: 3;
+    color: #753FEB;
+    text-style: bold;
+    content-align: center middle;
+    margin-bottom: 1;
+}
+
+.config-label {
+    width: 100%;
+    height: 2;
+    color: #AAAAAA;
+    text-style: bold;
+    margin-top: 1;
+}
+
+.config-options {
+    width: 100%;
+    height: 3;
+    align: center middle;
+}
+
+.config-option {
+    width: 1fr;
+    height: 3;
+    color: #FFFFFF;
+    background: #303030;
+    content-align: center middle;
+    text-style: bold;
+    margin: 0 1;
+}
+
+.selected-option {
+    color: #FFFFFF;
+    background: #753FEB;
+}
+
+/* TOP CONTROL SELECTED STATES */
+
+#custom-word-count {
+    width: 100%;
+    height: 3;
+    margin-top: 1;
+    background: #303030;
+    color: #FFFFFF;
+    border: round #444444;
+}
+
+#save-config {
+    width: 100%;
+    height: 3;
+    color: #FFFFFF;
+    background: #753FEB;
+    text-style: bold;
+    content-align: center middle;
+    margin-top: 2;
+}
+
+#word-options {
+    display: none;
+}
+
+#custom-word-count {
+    display: none;
 }

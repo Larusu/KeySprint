@@ -4,6 +4,7 @@ class Timer():
         self.remaining_time = timer
         self.is_running = False
         self.is_finished = False
+        self.elapsed_time = 0
 
     def start_timer(self):
         if self.is_running == False and self.is_finished == False:
@@ -23,3 +24,4 @@ class Timer():
         self.remaining_time = timer
         self.is_running = False
         self.is_finished = False
+        self.elapsed_time = 0

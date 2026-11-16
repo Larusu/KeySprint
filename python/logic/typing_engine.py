@@ -1,4 +1,3 @@
-
 def eval_text(typed_text, target_text):
     result = []
 
