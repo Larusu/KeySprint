@@ -35,7 +35,6 @@ public class KeySprint {
 
     private static final int LOOKAHEAD = 50;
     private static final int MAX_EXTRA = 5;
-    private static final char SKIP = '\0';
     private static final int TICK_MS = 100;
     private static final int ESCAPE_MS = 30;
     private static final int KEY_ESC = 0x110000;
@@ -853,10 +852,8 @@ public class KeySprint {
         String typed = typedWords.get(cursor);
         if (typed.length() < target.length()) {
             missed++;
-            typedWords.set(cursor, typed + SKIP);
-        } else {
-            cursor++;
         }
+        cursor++;
     }
 
     private void countCurrentWordAsMissed() {
@@ -888,9 +885,7 @@ public class KeySprint {
         if (!typed.isEmpty()) {
             int i = typed.length() - 1;
             char last = typed.charAt(i);
-            if (last == SKIP) {
-                missed--;
-            } else if (i >= target.length()) {
+            if (i >= target.length()) {
                 extra--;
             } else if (target.charAt(i) == last) {
                 correct--;
@@ -902,9 +897,10 @@ public class KeySprint {
         }
 
         if (cursor > 0) {
-            // Don't cross a fully correct word.
-            if (typedWords.get(cursor - 1).equals(picked.get(cursor - 1))) return;
             cursor--;
+            if (typedWords.get(cursor).length() < picked.get(cursor).length() && missed > 0) {
+                missed--;
+            }
         }
     }
 
