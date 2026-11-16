@@ -28,31 +28,27 @@ public class KeySprint {
     private static final int C1 = 18; // mode/counter
     private static final int C2 = 23; // difficulty
     private static final int C3 = 23; // preset
-    private static final int C4 = 9; // start
-    private static final int INNER_WIDTH = C1 + C2 + C3 + C4 + 3;
+    private static final int INNER_WIDTH = C1 + C2 + C3 + 2;
     private static final int BOX_WIDTH = INNER_WIDTH + 2;
     private static final int WORD_WRAP = 50;
     private static final int CONTENT_OFFSET = (INNER_WIDTH - WORD_WRAP) / 2 + 1;
 
-    private static final int PREVIEW_COUNT = 10;
     private static final int LOOKAHEAD = 50;
     private static final int MAX_EXTRA = 5;
     private static final char SKIP = '\0';
     private static final int TICK_MS = 100;
     private static final int ESCAPE_MS = 30;
-    private static final String MENU_FOOT =
-            "ctrl+c - exit     \u2190 \u2192 - move     enter - select/start";
-    private static final String PLAY_FOOT = "esc - restart     ctrl+c - exit";
-    private static final String RESULTS_FOOT = "ctrl+c - exit     esc - return to menu";
-    private static final String EDIT_FOOT = "Enter: save     Esc: cancel";
-
-    // Key codes outside Unicode range.
     private static final int KEY_ESC = 0x110000;
     private static final int KEY_LEFT = 0x110001;
     private static final int KEY_RIGHT = 0x110002;
     private static final int KEY_IGNORE = 0x110003;
+    private static final int KEY_CTRL_F = 6;
 
-    private enum State { MENU, PLAYING, RESULTS }
+    private static final String PLAY_FOOT = "ctrl+c - exit     ctrl+f - config     esc - restart";
+    private static final String RESULTS_FOOT = "ctrl+c - exit     ctrl+f - config     esc - new game";
+    private static final String EDIT_FOOT = "Enter: save     Esc: cancel";
+
+    private enum State { CONFIG, PLAYING, RESULTS }
 
     private Map<String, List<String>> wordBank;
     private final Random rng = new Random();
@@ -60,11 +56,11 @@ public class KeySprint {
     private final Config config = new Config();
     private final Config.Editor editor = new Config.Editor();
 
-    // 0-1 mode, 2-5 difficulty, 6+ preset, last start.
+    // 0-1 mode, 2-5 difficulty, 6+ preset.
     private int sel;
     private boolean headerDirty;
 
-    private State state = State.MENU;
+    private State state = State.CONFIG;
     private List<String> picked;
     private final List<String> typedWords = new ArrayList<>();
     private int cursor;
@@ -81,7 +77,6 @@ public class KeySprint {
     private int termHeight;
     private int boxRow;
     private int boxCol;
-    // Keep the original box height for every word count; longer rounds scroll.
     private final int bodyRows = BASE_BODY_ROWS;
     private boolean waitingForSize;
     private boolean timerPaused;
@@ -165,8 +160,7 @@ public class KeySprint {
     }
 
     private void setup() {
-        sel = 0;
-        refreshPreview();
+        newRound();
 
         out.print("\033[0m");
         out.print("\033[?1049h"); // Alternate screen.
@@ -285,17 +279,16 @@ public class KeySprint {
         move(screenRow(ROW_TOP), boxCol);
         out.print("\u250c" + "\u2500".repeat(C1) + "\u252c"
                 + "\u2500".repeat(C2) + "\u252c" + "\u2500".repeat(C3)
-                + "\u252c" + "\u2500".repeat(C4) + "\u2510");
+                + "\u2510");
 
         move(screenRow(ROW_HEAD), boxCol);
         out.print("\u2502" + " ".repeat(C1) + "\u2502"
-                + " ".repeat(C2) + "\u2502" + " ".repeat(C3)
-                + "\u2502" + " ".repeat(C4) + "\u2502");
+                + " ".repeat(C2) + "\u2502" + " ".repeat(C3) + "\u2502");
 
         move(screenRow(ROW_SEP), boxCol);
         out.print("\u251c" + "\u2500".repeat(C1) + "\u2534"
                 + "\u2500".repeat(C2) + "\u2534" + "\u2500".repeat(C3)
-                + "\u2534" + "\u2500".repeat(C4) + "\u2524");
+                + "\u2524");
 
         for (int r = 0; r < bodyRows; r++) {
             move(screenRow(ROW_BODY + r), boxCol);
@@ -310,17 +303,13 @@ public class KeySprint {
         return config.mode == Config.Mode.WORDS ? 5 : 4;
     }
 
-    private int startIndex() {
-        return 6 + presetCount();
-    }
-
     private int menuItemCount() {
-        return startIndex() + 1;
+        return 6 + presetCount();
     }
 
     private void drawCounter() {
         String text;
-        if (state == State.MENU) {
+        if (state == State.CONFIG) {
             int focus = !editor.editing && sel < 2 ? sel : -1;
             text = cellChips(new String[] {"Time", "Words"},
                     config.mode.ordinal(), focus, C1);
@@ -342,18 +331,14 @@ public class KeySprint {
     }
 
     private void drawHeaderCells() {
-        boolean inMenu = state == State.MENU && !editor.editing;
-        int diffFocus = inMenu && sel >= 2 && sel < 6 ? sel - 2 : -1;
-        int start = startIndex();
-        int presetFocus = inMenu && sel >= 6 && sel < start ? sel - 6 : -1;
-        int startFocus = inMenu && sel == start ? 0 : -1;
+        boolean inConfig = state == State.CONFIG && !editor.editing;
+        int diffFocus = inConfig && sel >= 2 && sel < 6 ? sel - 2 : -1;
+        int presetFocus = inConfig && sel >= 6 && sel < 6 + presetCount() ? sel - 6 : -1;
 
         move(screenRow(ROW_HEAD), boxCol + 1 + C1 + 1);
         out.print(cellChips(WordBank.LABELS, config.difficulty, diffFocus, C2));
         move(screenRow(ROW_HEAD), boxCol + 1 + C1 + 1 + C2 + 1);
         out.print(cellChips(config.presetLabels(), config.presetIndex(), presetFocus, C3));
-        move(screenRow(ROW_HEAD), boxCol + 1 + C1 + 1 + C2 + 1 + C3 + 1);
-        out.print(cellChips(new String[] {"start"}, -1, startFocus, C4));
     }
 
     private String cellChips(String[] chips, int selected, int focused, int width) {
@@ -379,7 +364,7 @@ public class KeySprint {
 
     private void drawBody() {
         if (state == State.RESULTS) return;
-        if (state == State.MENU && editor.editing) {
+        if (state == State.CONFIG && editor.editing) {
             drawEditor();
             return;
         }
@@ -419,10 +404,10 @@ public class KeySprint {
 
     private void drawFooter() {
         String f;
-        if (state == State.MENU && editor.editing) {
+        if (state == State.CONFIG && editor.editing) {
             f = EDIT_FOOT;
-        } else if (state == State.MENU) {
-            f = MENU_FOOT;
+        } else if (state == State.CONFIG) {
+            f = "ctrl+c - exit     esc - back     \u2190 \u2192 - move     enter - select";
         } else if (state == State.PLAYING) {
             f = PLAY_FOOT;
         } else {
@@ -610,7 +595,7 @@ public class KeySprint {
                 }
                 if (waitingForSize) {
                     if (key == KEY_ESC && state == State.PLAYING) {
-                        abortGame();
+                        newRound();
                     }
                     continue;
                 }
@@ -668,17 +653,22 @@ public class KeySprint {
             running = false;
             return;
         }
+        if (key == KEY_CTRL_F && state != State.CONFIG) {
+            openConfig();
+            return;
+        }
 
-        if (state == State.MENU) {
-            handleMenuKey(key);
+        if (state == State.CONFIG) {
+            handleConfigKey(key);
         } else if (state == State.PLAYING) {
             handlePlayKey(key);
         } else if (key == KEY_ESC) {
-            returnToMenu();
+            newRound();
+            relayout();
         }
     }
 
-    private void handleMenuKey(int key) {
+    private void handleConfigKey(int key) {
         if (editor.editing) {
             if (key == KEY_ESC) {
                 cancelEditor();
@@ -695,7 +685,8 @@ public class KeySprint {
         }
 
         if (key == KEY_ESC) {
-            running = false;
+            newRound();
+            relayout();
             return;
         }
         if (key == KEY_LEFT) {
@@ -708,8 +699,7 @@ public class KeySprint {
         }
         if (key >= '1' && key <= '4') {
             config.selectDifficulty(key - '1');
-            refreshPreview();
-            headerDirty = true;
+            previewWords();
             return;
         }
         if (key == 13 || key == 10) {
@@ -719,7 +709,8 @@ public class KeySprint {
 
     private void handlePlayKey(int key) {
         if (key == KEY_ESC) {
-            abortGame();
+            newRound();
+            relayout();
             return;
         }
         if (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_IGNORE) return;
@@ -743,16 +734,14 @@ public class KeySprint {
     }
 
     private void activateMenuItem() {
-        int start = startIndex();
         if (sel < 2) {
             config.selectMode(sel);
             if (sel >= menuItemCount()) sel = menuItemCount() - 1;
             headerDirty = true;
         } else if (sel < 6) {
             config.selectDifficulty(sel - 2);
-            refreshPreview();
             headerDirty = true;
-        } else if (sel < start) {
+        } else {
             int preset = sel - 6;
             if (config.mode == Config.Mode.WORDS && preset == 4) {
                 config.openEditor(editor);
@@ -761,9 +750,8 @@ public class KeySprint {
                 config.selectPreset(preset);
                 headerDirty = true;
             }
-        } else {
-            startGame();
         }
+        previewWords();
     }
 
     private void cancelEditor() {
@@ -779,7 +767,8 @@ public class KeySprint {
         headerDirty = true;
     }
 
-    private void startGame() {
+    // Start a fresh round with the current settings. No drawing or relayout.
+    private void newRound() {
         state = State.PLAYING;
         editor.editing = false;
         editor.input = "";
@@ -799,30 +788,29 @@ public class KeySprint {
         picked = pickWords(count, null);
         resetTyped();
         headerDirty = true;
-        out.print("\033[?25h"); // Show cursor.
-        relayout();
     }
 
-    private void abortGame() {
+    // Open the config screen, discarding any run in progress.
+    private void openConfig() {
         startNanos = 0;
         endNanos = 0;
         completed = false;
         timerPaused = false;
         pauseStartNanos = 0;
-        returnToMenu();
-    }
-
-    private void returnToMenu() {
-        state = State.MENU;
         cancelEditor();
-        refreshPreview();
-        out.print("\033[?25l");
+        previewWords();
+        state = State.CONFIG;
         relayout();
     }
 
-    private void refreshPreview() {
-        picked = pickWords(PREVIEW_COUNT, null);
+    // Pick preview words for the config screen based on current settings.
+    private void previewWords() {
+        int count = config.mode == Config.Mode.WORDS
+                ? config.wordCount
+                : (config.difficulty == 0 ? 80 : 70);
+        picked = pickWords(count, null);
         resetTyped();
+        headerDirty = true;
     }
 
     private void resetTyped() {
@@ -949,6 +937,7 @@ public class KeySprint {
         out.print("\033[0 q"); // Reset cursor style.
         out.print("\033[?25h"); // Show cursor.
         out.print("\033[?1049l"); // Leave alternate screen.
+        out.print("\033[2J\033[H"); // Clear terminal on exit.
         out.flush();
         terminal.setAttributes(original);
         terminal.close();
