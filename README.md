@@ -2,7 +2,44 @@
 
 ## Running Python Version
 
-in-progress
+Requires **Python 3.10 or newer** and the Textual library.
+
+### Setup and run
+
+From the project root, navigate to the Python directory:
+
+```bash
+cd python
+```
+
+Install Textual:
+
+```bash
+pip install textual
+```
+
+Run the game:
+
+```bash
+python main.py
+```
+
+### Controls
+
+| Key | Action |
+|-----|--------|
+| Printable characters | Enter text during gameplay |
+| `Backspace` | Delete the previous character |
+| `Ctrl + R` | Restart the current game or results session |
+| `Ctrl + F` | Open the configuration panel |
+| `Esc` | Exit the application |
+
+### Project Structure
+
+`main.py` – Application entry point.
+`screens/` – Game and results screen implementations.
+`logic/` – Typing validation, word generation, timer, and performance calculations.
+`styles/` – Textual application stylesheets.
 
 ## Running Java Version
 
