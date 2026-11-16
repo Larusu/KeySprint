@@ -11,6 +11,8 @@ from logic.calculations import calculate_extra_chars
 
 from screens.results_screen import ResultsScreen
 
+from rich.text import Text
+
 class GameScreen(Screen):
     CSS_PATH = "../styles/app.tcss"
     AUTO_FOCUS = ""
@@ -95,10 +97,18 @@ class GameScreen(Screen):
 
             # BOTTOM CONTROLS
             with Horizontal(id="bottom-controls"):
-                yield Static("[[ctrl+r]] Restart", id="restart")
-                yield Static("[[esc]] Exit", id="exit")
-                yield Static("[[ctrl+f]] Custom", id="custom")
-
+                yield Static(
+                    Text("ctrl + r", style="#753FEB") + Text(" - Restart", style="#FFFFFF"),
+                    id="restart"
+                )
+                yield Static(
+                    Text("esc", style="#753FEB") + Text(" - Exit", style="#FFFFFF"),
+                    id="exit"
+                )
+                yield Static(
+                    Text("ctrl + f", style="#753FEB") + Text(" - Custom", style="#FFFFFF"),
+                    id="custom"
+                )
 
     def __init__(self):
         super().__init__()
@@ -127,6 +137,7 @@ class GameScreen(Screen):
         self.batch_start_count = 0
 
         self.remaining_words = []
+        self.missed_characters = {}
 
         generated_words = generate_words(self.selected_difficulty)
         self.target_text = " ".join(generated_words)
@@ -186,6 +197,16 @@ class GameScreen(Screen):
             return
 
         if character == " ":
+            word_index = self.completed_words - self.batch_start_count
+
+            typed_word = self.typed_text.split(" ")[-1]
+            target_word = self.target_text.split(" ")[word_index]
+
+            remaining_word = target_word[len(typed_word):]
+
+            if remaining_word:
+                self.missed_characters[word_index] = remaining_word
+
             self.completed_words += 1
 
         self.typed_text += character
@@ -289,7 +310,7 @@ class GameScreen(Screen):
         self.extra_char_count = calculate_extra_chars(self.typed_text, self.target_text)
 
     def format_target_text(self):
-        formatted_text = ""
+        formatted_text = Text()
         result_index = 0
 
         target_words = self.target_text.split(" ")
@@ -303,15 +324,19 @@ class GameScreen(Screen):
                 for char_index, character in enumerate(typed_word):
                     if result_index < len(self.char_results):
                         if self.char_results[result_index]:
-                            formatted_text += f"[white]{character}[/white]"
+                            formatted_text.append(character, style="white")
                         else:
-                            formatted_text += f"[red]{character}[/red]"
+                            formatted_text.append(character, style="red")
 
                         result_index += 1
 
                 # Preserve the untyped portion of the word
                 remaining_word = target_word[len(typed_word):]
-                formatted_text += remaining_word
+
+                if index in self.missed_characters:
+                    formatted_text.append(remaining_word, style="red")
+                else:
+                    formatted_text += remaining_word
 
             else:
                 # Display words that haven't been reached yet
@@ -360,6 +385,7 @@ class GameScreen(Screen):
                 self.char_results = []
                 self.format_target_text()
                 self.extra_char_count = 0
+                self.missed_characters = {}
 
         elif self.selected_mode == "words":
             completed_in_batch = self.completed_words - self.batch_start_count
@@ -400,6 +426,7 @@ class GameScreen(Screen):
         self.char_all_results = []
         self.extra_char_count = 0
         self.extra_char_all_count = 0
+        self.missed_characters = {}
 
         self.timer.reset_timer(self.selected_time)
 
