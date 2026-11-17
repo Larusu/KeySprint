@@ -1,5 +1,6 @@
 keysprint
 .freebuff
+superpowers/
 .venv/
 __pycache__/
 *.pyc
