@@ -13,6 +13,8 @@ describe its terms and underlying sources.
 KeySprint modifications: retain lowercase ASCII words, exclude whole-word
 blocklist matches, remove duplicates, and append eligible words after the
 Google no-swears base. Then remove every practice word shorter than three
-letters from all pools without replacement. Original frequency numbers are omitted.
+letters from all pools without replacement. A later direct review removed
+profanity, vulgar sexual language, and degrading slurs from all pools.
+Original frequency numbers are omitted.
 The supplemental contribution remains subject to CC BY-SA 4.0. The Google
 contribution has the separate notice preserved beside this file.

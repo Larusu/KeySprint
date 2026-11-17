@@ -8,14 +8,17 @@ intentionally repeat their shared prefix so each level is easy to inspect.
 | --- | ---: | ---: |
 | `english_1k` | 1,000 | 933 |
 | `english_5k` | 5,000 | 4,772 |
-| `english_10k` | 10,000 | 9,474 |
-| `english_25k` | 25,000 | 24,165 |
+| `english_10k` | 10,000 | 9,472 |
+| `english_25k` | 25,000 | 24,129 |
 
-The final count is 39,344 array entries across all four levels. There are 24,165
+The current count is 39,306 array entries across all four levels. There are 24,129
 distinct vocabulary words. Every practice word has at least three letters.
-The formatted `words.json` is 671,791 bytes.
+The formatted `words.json` is 671,355 bytes.
 
 ## Construction
+
+The following figures describe the original construction, before the direct
+vocabulary review on November 17, 2026.
 
 1. Start with the supplied Google no-swears list's 9,894 lowercase `a-z` words in
    their original order. Its original first 1,000 and 5,000 entries define the
@@ -31,8 +34,8 @@ The formatted `words.json` is 671,791 bytes.
    67, 228, 420, and 502 entries respectively. Retain source order and do not
    refill the original boundaries: the 1k pool is the filtered original 1,000
    entries, rather than the first 1,000 entries remaining after filtering.
-5. Record the actual counts. The final Google base contains 9,474 words and its
-   supplement contains 14,691. No invented words, duplicate padding, or extra
+5. Record the counts after the length filter. The Google base contained 9,474 words and its
+   supplement contained 14,691. No invented words, duplicate padding, or extra
    sources are used to reach a nominal target.
 
 The resulting 25k pool is a cumulative combination of two sources; its entire
@@ -41,25 +44,16 @@ not exact copies of Monkeytype's language files.
 
 ## Filtering scope
 
-`profanity-blocklist.json` is reusable data with exact whole-word matching.
-It documents the exclusion set used to prepare the supplemental vocabulary.
-Generation checks every added word against it before writing the word bank.
-The game does not need to repeat that filtering during play.
-
-The Google no-swears base retains its source order after removing entries shorter
-than three letters. The requested minimum length supersedes the earlier decision
-to preserve every base entry. Eight retained base words match the current
-combined blocklist; that newer profanity blocklist is not applied retroactively
-to the base. The overlap is recorded in
-`metadata.filtering.preserved_base_matches_current_blocklist`.
-
-The minimum length applies to practice vocabulary. The 302-entry blocklist keeps
-its original exclusion set, including any short entries, for reuse and auditing.
+On November 17, 2026, the unique vocabulary was directly reviewed for
+profanity, vulgar sexual language, and degrading slurs. Identified words were
+removed from every pool by whole-word decision, without replacement. The
+current Google base contains 9,472 words and the supplement contains 14,657.
+The review does not guarantee that every retained word suits every audience.
 
 ## Pinned sources and attribution
 
 Full URLs, commits, raw-file SHA-256 digests, and source identifiers are embedded
-in both data files. Every vocabulary array also has a digest in
+in `words.json`. Every vocabulary array also has a digest in
 `metadata.level_sha256`: hash its UTF-8 words in order, one per line, including
 a newline after the last word.
 

@@ -38,7 +38,7 @@ Time presets are 15, 30, 60, and 120 seconds. Word-count presets are 10, 25, 50,
 and 75, with 25 selected by default. Custom counts accept 1 through 10,000.
 
 Vocabulary choices are English 1k, 5k, 10k, and 25k. The actual pool sizes are
-933, 4,772, 9,474, and 24,165. Every word has at least three lowercase letters.
+933, 4,772, 9,472, and 24,129. Every word has at least three lowercase letters.
 Larger pools include the smaller pools. Repeats are allowed, except consecutive
 words, including the boundary between timed refills.
 See [source and license notes](../data/SOURCES.md).
