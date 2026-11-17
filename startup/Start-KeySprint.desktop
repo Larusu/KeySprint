@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=KeySprint
+Comment=Choose and launch the Python, Java, or C++ game
+Terminal=true
+Exec=/bin/sh -c "exec /bin/sh \\"\\$(dirname -- \\"\\$1\\")/Start-KeySprint.sh\\"" keysprint %k
+Icon=utilities-terminal
+Categories=Game;
