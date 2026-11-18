@@ -32,7 +32,7 @@ HistoryStore load_history(const std::string& path)
 
     std::ifstream file(path);
     if (!file)
-        throw store; // first run
+        return store; // first run
 
     const auto json = nlohmann::json::parse(file);
 

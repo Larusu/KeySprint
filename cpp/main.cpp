@@ -198,7 +198,7 @@ int main(int argc, char** argv)
         return 1;
     }
     std::string history_path = "data/history.json";
-    for (const std::string& c : {"data/history.json", "../data/history.json"})
+    for (const char* c : {"data/history.json", "../data/history.json"})
         if (std::filesystem::is_regular_file(c)) { history_path = c; break; }
     app.history_store = load_history(history_path);
 
