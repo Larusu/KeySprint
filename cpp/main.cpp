@@ -7,6 +7,7 @@
 #include <string>
 #include "config.h"
 #include "game.h"
+#include "history.h"
 #include "terminal.h"
 #include "scoring.h"
 #include "render.h"
@@ -21,6 +22,7 @@ const Result NO_RESULT{};         // passed to render before a game ends
 
 struct App {
     WordBank word_bank;
+    HistoryStore history_store;
     Config config;
     Game game;
     State state = State::Playing;
@@ -195,6 +197,10 @@ int main(int argc, char** argv)
         std::cerr << "Startup error: " << error.what() << '\n';
         return 1;
     }
+    std::string history_path = "data/history.json";
+    for (const std::string& c : {"data/history.json", "../data/history.json"})
+        if (std::filesystem::is_regular_file(c)) { history_path = c; break; }
+    app.history_store = load_history(history_path);
 
     try
     {

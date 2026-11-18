@@ -34,7 +34,7 @@ CXX      ?= g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -Wmissing-declarations -pipe
 CPPFLAGS += -Iinclude -MMD -MP
 
-SOURCES      = main.cpp terminal.cpp game.cpp scoring.cpp render.cpp config.cpp word_bank.cpp
+SOURCES      = main.cpp terminal.cpp game.cpp scoring.cpp render.cpp config.cpp word_bank.cpp history.cpp
 OBJECTS      = $(SOURCES:%.cpp=$(BUILD)/%.o)
 LIB_OBJECTS  = $(filter-out $(BUILD)/main.o,$(OBJECTS))
 TEST_OBJECT  = $(BUILD)/core_tests.o
