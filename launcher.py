@@ -199,16 +199,15 @@ class Launcher:
             raise SetupError("A C++ compiler was not found.\n" + help_text)
         version = probe([compiler, "--version"], self.root, help_text)
         source_dir = self.root / "cpp"
-        sources = [source_dir / name for name in (
-            "main.cpp", "terminal.cpp", "game.cpp", "scoring.cpp", "render.cpp",
-            "config.cpp", "word_bank.cpp")]
+        sources = sorted(source_dir.glob("*.cpp"))
+        if not sources or not (source_dir / "main.cpp").is_file():
+            raise SetupError("C++ source files are missing; restore the complete project folder.") # :P
         if not all(path.is_file() for path in sources):
             raise SetupError("C++ source files are missing; restore the complete project folder.")
         headers = sorted(set(source_dir.rglob("*.h")) | set(source_dir.rglob("*.hpp")))
         folder = self.build / "cpp"
         executable = folder / ("keysprint.exe" if os.name == "nt" else "keysprint")
-        command = [compiler, "-std=c++17", "-Wall", "-Wextra", "-pthread",
-                   "-I", str(source_dir / "include")]
+        command = [compiler, "-std=c++17", "-pthread", "-I", str(source_dir / "include")]
         command += [str(path) for path in sources] + ["-o", str(executable)]
         self.compile_cached(folder, command, sources + headers, version, [executable],
                             "Check the compiler messages above; a C++17 toolchain is required.\n" + help_text)
