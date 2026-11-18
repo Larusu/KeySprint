@@ -31,7 +31,8 @@ TARGET      = $(BUILD)/keysprint$(EXE)
 TEST_TARGET = $(BUILD)/core-tests$(EXE)
 
 CXX      ?= g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -Wmissing-declarations -pipe
+CXXFLAGS = -std=c++17 -Wall -Wextra -Wmissing-declarations -pipe -pthread
+LDFLAGS  += -pthread
 CPPFLAGS += -Iinclude -MMD -MP
 
 SOURCES      = main.cpp terminal.cpp game.cpp scoring.cpp render.cpp config.cpp word_bank.cpp history.cpp

@@ -4,6 +4,7 @@
 #include "game.h"
 
 struct Result {             // for JSON
+    bool        new_best   = false;
     double      wpm        = 0.0;
     double      accuracy   = 0.0; // percent
     double      duration   = 0.0; // seconds

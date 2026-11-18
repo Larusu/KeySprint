@@ -1,6 +1,7 @@
 #include "history.h"
 #include "include/nlohmann/json.hpp"
 #include <fstream>
+#include <stdexcept>
 
 namespace {
 
@@ -12,7 +13,10 @@ void save_history(const HistoryStore& s)
     json["records"]  = nlohmann::json::object();
     for(const auto& [key, h] : s.bank)
         json["records"][key] = { { "wpm", h.wpm }, { "accuracy", h.accuracy } };
-    std::ofstream(s.path) << json.dump(3);
+    std::ofstream out(s.path);
+    if(!out)
+        throw std::runtime_error("Failed writing history file: " + s.path);
+    out << json.dump(3);
 }
 
 }
@@ -48,7 +52,7 @@ HistoryStore load_history(const std::string& path)
             if(!val.is_object())
                 continue;
             store.bank[key] = { 
-                val.value("wpm",      0.0),
+                val.value("wpm",      0),
                 val.value("accuracy", 0.0)
             };
         }
@@ -57,13 +61,16 @@ HistoryStore load_history(const std::string& path)
     return store;
 }
 
-void record_result(HistoryStore& s, const Config& c, const Result& r)
+bool record_result(HistoryStore& s, const Config& c, const Result& r)
 {
     s.attempts++;
     History& h = s.bank[history_key(c)]; // entry inside the map (HistoryBank)
-    h.wpm      = std::max(h.wpm, r.wpm); // the map now has this value
+    const int wpm = static_cast<int>(std::lround(r.wpm));
+    const bool new_best = r.wpm > h.wpm;
+    h.wpm      = std::max(h.wpm, wpm); // the map now has this value
     h.accuracy = std::max(h.accuracy, r.accuracy);
     save_history(s);
+    return new_best;
 }
 
 History best_for(const HistoryStore& s, const Config& c)

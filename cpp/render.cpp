@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include "history.h"
 #include "terminal.h"
 #include "render.h"
 
@@ -16,7 +17,8 @@ constexpr int PADDING_X     = 2;
 constexpr int PADDING_Y     = 1;
 constexpr int BOX_HEIGHT    = VISIBLE_LINES + 2 + 2 * PADDING_Y;
 constexpr int BAR_HEIGHT    = 3;
-constexpr int TOTAL_HEIGHT  = BAR_HEIGHT + BOX_HEIGHT + 2;
+constexpr int BEST_HEIGHT   = 3;
+constexpr int TOTAL_HEIGHT  = BAR_HEIGHT + BEST_HEIGHT + BOX_HEIGHT + 2;
 
 constexpr int SELECTOR_GAP      = 1;
 // fixed weight so the bar doesn't resize when the mode changes
@@ -429,6 +431,30 @@ void draw_text(Screen& screen, Position box, const Game& g)
     }
 }
 
+void draw_best(Screen& screen, Position box, const HistoryStore& hs, const Config& c)
+{
+    const int bar_row = box.row + BOX_HEIGHT;
+    draw_box(screen, bar_row, box.col, BOX_WIDTH, BEST_HEIGHT);
+
+    const History best = best_for(hs, c);
+    const std::pair<std::string_view, std::string> stats[] = {
+        {"Best WPM:", std::to_string(std::lround(best.wpm))},
+        {"Accuracy:", std::to_string(std::lround(best.accuracy)) + "%"},
+        {"Attempts:", std::to_string(hs.attempts)}
+    };
+
+    const int n = int(std::size(stats));
+    const int row = bar_row + BEST_HEIGHT / 2;
+    for(int i = 0; i < n; i++)
+    {
+        const auto& [label, value] = stats[i];
+        const int width  = int(label.size()) + 1 + int(value.size());
+        const int center = box.col + BOX_WIDTH * (2 * i + 1) / (2 * n);
+        put(screen, {row, center - width / 2}, label, Style::Normal);
+        put(screen, {row, center - width / 2 + int(label.size()) + 1}, value, Style::Green);
+    }
+}
+
 void draw_playing(Screen& screen, const Game& g, const Config& c, Position size)
 {
     const Position box = box_origin(size);
@@ -487,21 +513,21 @@ void draw_hints(Screen& screen, Position box, int row, std::initializer_list<Hin
 
 void draw_footer(Screen& screen, Position box, const Game& g, const Config& c, State s)
 {
-    const int row = box.row + BOX_HEIGHT + 1;          // 2 rows below the box
+    const int row = box.row + BOX_HEIGHT + BEST_HEIGHT + 1;
 
     switch (s)
     {
         case State::Playing:
             if (g.start)
-                draw_hints(screen, box, row, {{"esc", "restart"}});
+                draw_hints(screen, box, row - BEST_HEIGHT, {{"esc", "restart"}});
             else
-                draw_hints(screen, box, row, {{"ctrl+n", "new game"}, {"ctrl+f", "config"},
-                                              {"ctrl+c", "exit"}});
+                draw_hints(screen, box, row, {{"ctrl+n", "new game"}, 
+                        {"ctrl+f", "config"}, {"ctrl+c", "exit"}});
             break;
         case State::Config:
         {
-            draw_hints(screen, box, row, {{"tab", "new section"}, {"</>", "left/right"},
-                                          {"esc", "back"}});
+            draw_hints(screen, box, row, {{"tab", "new section"}, 
+                    {"</>", "left/right"}, {"esc", "back"}});
             const int row2 = std::min(row + 2, screen.rows);
             if (c.mode == Mode::Words)
                 draw_hints(screen, box, row2, {{"1-4", "difficulty"}, {"w", "word count"}});
@@ -510,14 +536,16 @@ void draw_footer(Screen& screen, Position box, const Game& g, const Config& c, S
             break;
         }
         case State::Results:
-            draw_hints(screen, box, row, {{"ctrl+n", "new game"}, {"ctrl+c", "exit"}});
+            draw_hints(screen, box, row, {{"ctrl+n", "new game"}, 
+                                                        {"ctrl+c", "exit"}});
             break;
         case State::Exit:
             break;
     }
 }
 // ---------- result ----------
-void draw_results(Screen& screen, const Result& r, Position size)
+void draw_results(Screen& screen, const Result& r, const HistoryStore& hs, 
+        const Config& c, Position size)
 {
     const Position box = box_origin(size);
     draw_box(screen, box.row, box.col, BOX_WIDTH, BOX_HEIGHT);
@@ -528,8 +556,9 @@ void draw_results(Screen& screen, const Result& r, Position size)
     put(screen, {box.row - BAR_HEIGHT + 1,
                  box.col + (BOX_WIDTH - int(header.size())) / 2}, header);
 
+    std::string crown = r.new_best ? " new best" : ""; // " ★"
     const std::pair<std::string_view, std::string> stats[] = {
-        {"wpm:",       std::to_string(std::lround(r.wpm))},
+        {"wpm:",       std::to_string(std::lround(r.wpm)) + crown},
         {"accuracy:",  std::to_string(std::lround(r.accuracy)) + "%"},
         {"correct:",   std::to_string(r.chars.correct)},
         {"incorrect:", std::to_string(r.chars.incorrect)},
@@ -545,10 +574,12 @@ void draw_results(Screen& screen, const Result& r, Position size)
         put(screen, {row, mid + 2}, value, Style::Green);
         row++;
     }
+    draw_best(screen, box, hs, c);
 }
 }
 
-void render(const Game& g, const Config& c, const State& s, const Result& r, size_t focus, const ConfigEditor& editor)
+void render(const Game& g, const Config& c, const State& s, const Result& r, 
+        size_t focus, const ConfigEditor& editor, const HistoryStore& hs)
 {
     const Position size = get_term_size();
     if (size.col < MIN_COLS || size.row < MIN_ROWS)
@@ -574,11 +605,14 @@ void render(const Game& g, const Config& c, const State& s, const Result& r, siz
     switch (s)
     {
         case State::Playing: draw_playing(live_screen, g, c, size);       break;
-        case State::Results: draw_results(live_screen, r, size);          break;
+        case State::Results: draw_results(live_screen, r, hs, c, size);   break;
         case State::Config:  draw_config(live_screen, g, c, size, focus, editor); break;
         case State::Exit:    break;
     }
     draw_footer(live_screen, box, g, c, s);
+
+    if(!g.start.has_value())
+        draw_best(live_screen, box, hs, c);
 
     const std::string update = screen_flush(live_screen);
     if (!update.empty())

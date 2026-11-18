@@ -7,7 +7,7 @@
 #include <string_view>
 
 struct History { // per config record
-    double wpm      = 0.0;
+    int wpm         = 0.0;
     double accuracy = 0.0;
 };
 
@@ -21,5 +21,5 @@ struct HistoryStore {
 
 inline std::string history_key(const Config& c);
 HistoryStore load_history(const std::string& path);
-void record_result(HistoryStore& s, const Config& c, const Result& r);
+bool record_result(HistoryStore& s, const Config& c, const Result& r);
 History best_for(const HistoryStore& s, const Config& c);

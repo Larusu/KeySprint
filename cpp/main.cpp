@@ -177,7 +177,9 @@ void update(App& app)
     top_up_words(app.game, app.config);
     if (is_over(app.game, app.config))
     {
-        app.result = make_result(app.game, app.config);
+        Result r = make_result(app.game, app.config);
+        r.new_best = record_result(app.history_store, app.config, r);
+        app.result = r;
         app.state = State::Results;
     }
 }
@@ -189,7 +191,11 @@ int main(int argc, char** argv)
     App app;
     try
     { // Parse and prepare the first round before touching the terminal.
-        app.word_bank = load_word_bank(find_word_bank(argc, argv));
+        const std::string bank_path = find_word_bank(argc, argv);
+        app.word_bank = load_word_bank(bank_path);
+        std::string history_path = 
+            (std::filesystem::path(bank_path).parent_path() / "history.json").string();
+        app.history_store = load_history(history_path);
         restart(app);
     }
     catch (const std::exception& error)
@@ -197,10 +203,6 @@ int main(int argc, char** argv)
         std::cerr << "Startup error: " << error.what() << '\n';
         return 1;
     }
-    std::string history_path = "data/history.json";
-    for (const char* c : {"data/history.json", "../data/history.json"})
-        if (std::filesystem::is_regular_file(c)) { history_path = c; break; }
-    app.history_store = load_history(history_path);
 
     try
     {
@@ -213,7 +215,8 @@ int main(int argc, char** argv)
             if (app.state != State::Exit)
             {
                 const Result& result = app.result ? *app.result : NO_RESULT;
-                render(app.game, app.config, app.state, result, app.config_focus, app.config_editor);
+                render(app.game, app.config, app.state, result, 
+                        app.config_focus, app.config_editor, app.history_store);
             }
             std::this_thread::sleep_until(frame_end);
         }
