@@ -194,6 +194,20 @@ class LauncherTests(unittest.TestCase):
              patch.object(launcher, "launch", return_value=0):
             self.assertEqual(launcher.main(), 0)
 
+    def test_terminal_is_cleared_after_game_returns_to_menu(self):
+        class TTYOutput(io.StringIO):
+            def isatty(self):
+                return True
+
+        output = TTYOutput()
+        with contextlib.redirect_stdout(output), \
+             patch("builtins.input", side_effect=["2", "0"]), \
+             patch.object(launcher.Launcher, "prepare_java", return_value=["java", "KeySprint"]), \
+             patch.object(launcher, "launch", return_value=0):
+            self.assertEqual(launcher.main(), 0)
+
+        self.assertEqual(output.getvalue().count("\033[2J\033[H"), 1)
+
     @unittest.skipIf(os.name == "nt", "POSIX signal delivery test")
     def test_game_ctrl_c_does_not_kill_launcher(self):
         # A real child interrupts the foreground process group, as Ctrl+C does.

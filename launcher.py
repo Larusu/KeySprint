@@ -233,6 +233,11 @@ def launch(command: list[str], cwd: Path) -> int:
             print("\033[0m\033[?25h\033[?1049l\033[?2004l", end="", flush=True)
 
 
+def clear_terminal() -> None:
+    if sys.stdout.isatty():
+        print("\033[2J\033[H", end="", flush=True)
+
+
 # Show the language menu, prepare the selected game, and launch it.
 # Return to the menu after the game or a setup error; exit on the quit option
 # or when Ctrl+C/end of input is received at the menu.
@@ -262,6 +267,7 @@ def main() -> int:
             command = prepare()
             print("Starting the game. Exit the game to return to this menu.", flush=True)
             status = launch(command, app.root / folder)
+            clear_terminal()
             if status not in (0, 130, -signal.SIGINT, 0xC000013A):
                 print(f"The game closed with exit code {status}; review its messages above.")
         except KeyboardInterrupt:
