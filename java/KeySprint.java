@@ -25,6 +25,7 @@ public class KeySprint {
     private static final int ROW_SEP = 3;
     private static final int ROW_BODY = 4;
     private static final int BASE_BODY_ROWS = 4;
+    private static final int RECTANGLE_INNER_HEIGHT = 1;
     private static final int C1 = 18; // mode/counter
     private static final int C2 = 23; // difficulty
     private static final int C3 = 23; // preset
@@ -50,6 +51,7 @@ public class KeySprint {
     private enum State { CONFIG, PLAYING, RESULTS }
 
     private Map<String, List<String>> wordBank;
+    private HistoryStore history;
     private final Random rng = new Random();
 
     private final Config config = new Config();
@@ -97,7 +99,10 @@ public class KeySprint {
     public static void main(String[] args) {
         KeySprint app = new KeySprint();
         try {
-            app.wordBank = WordBank.load(findWordBank(args));
+            String wordBankPath = findWordBank(args);
+            app.wordBank = WordBank.load(wordBankPath);
+            app.history = HistoryStore.load(
+                    Path.of(wordBankPath).toAbsolutePath().resolveSibling("history.json"));
         } catch (Exception e) {
             System.err.println("Startup error: " + e.getMessage());
             System.exit(1);
@@ -175,7 +180,7 @@ public class KeySprint {
     }
 
     private int rowFoot() {
-        return ROW_BODY + bodyRows + 2;
+        return ROW_BODY + bodyRows + RECTANGLE_INNER_HEIGHT + 4;
     }
 
     private int blockHeight() {
@@ -262,6 +267,7 @@ public class KeySprint {
         headerDirty = false;
         Arrays.fill(prevBodyLen, 0);
         drawBox();
+        drawRectangle(ROW_BODY + bodyRows + 1, RECTANGLE_INNER_HEIGHT);
         drawCounter();
         drawHeaderCells();
         if (state == State.RESULTS) {
@@ -294,7 +300,20 @@ public class KeySprint {
             out.print("\u2502" + " ".repeat(INNER_WIDTH) + "\u2502");
         }
 
-        move(screenRow(rowFoot() - 2), boxCol);
+        move(screenRow(ROW_BODY + bodyRows), boxCol);
+        out.print("\u2514" + "\u2500".repeat(INNER_WIDTH) + "\u2518");
+    }
+
+    private void drawRectangle(int startRow, int innerHeight) {
+        move(screenRow(startRow), boxCol);
+        out.print("\u250c" + "\u2500".repeat(INNER_WIDTH) + "\u2510");
+
+        for (int r = 0; r < innerHeight; r++) {
+            move(screenRow(startRow + 1 + r), boxCol);
+            out.print("\u2502" + " ".repeat(INNER_WIDTH) + "\u2502");
+        }
+
+        move(screenRow(startRow + 1 + innerHeight), boxCol);
         out.print("\u2514" + "\u2500".repeat(INNER_WIDTH) + "\u2518");
     }
 
@@ -402,6 +421,7 @@ public class KeySprint {
     }
 
     private void drawFooter() {
+        drawHistory();
         String f;
         if (state == State.CONFIG && editor.editing) {
             f = EDIT_FOOT;
@@ -419,6 +439,26 @@ public class KeySprint {
         int col = boxCol + Math.max(0, (BOX_WIDTH - f.length()) / 2);
         move(row, col);
         out.print(f);
+    }
+
+    private void drawHistory() {
+        HistoryStore.Best best = history.bestFor(config);
+        String[] labels = {"Best WPM:", "Accuracy:", "Attempts:"};
+        String[] values = {
+            Long.toString(Math.round(best.wpm)),
+            Long.toString(Math.round(best.accuracy)) + "%",
+            Integer.toString(history.attempts())
+        };
+        int row = screenRow(ROW_BODY + bodyRows + 2);
+        move(row, boxCol + 1);
+        out.print(" ".repeat(INNER_WIDTH));
+
+        for (int i = 0; i < labels.length; i++) {
+            int center = boxCol + 1 + INNER_WIDTH * (2 * i + 1) / (2 * labels.length);
+            int width = labels[i].length() + 1 + values[i].length();
+            move(row, center - width / 2);
+            out.print(labels[i] + " \033[33m" + values[i] + "\033[0m");
+        }
     }
 
     private String statCell(String label, String value) {
@@ -839,10 +879,11 @@ public class KeySprint {
         return cursor == last && typedWords.get(last).equals(picked.get(last));
     }
 
-    private void endGame() {
+    private void endGame() throws IOException {
         if (config.mode == Config.Mode.TIME) countCurrentWordAsMissed();
         completed = true;
         endNanos = System.nanoTime();
+        history.recordResult(config, wpm(), accuracy());
         state = State.RESULTS;
         relayout();
     }
