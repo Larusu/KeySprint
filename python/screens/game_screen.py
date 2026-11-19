@@ -5,6 +5,7 @@ from textual.containers import Horizontal, Vertical
 from textual import events
 
 from logic.word_generator import generate_words
+from logic.history import HistoryStore, HISTORY_PATH
 from logic.typing_engine import eval_text
 from logic.timer import Timer
 from logic.calculations import calculate_extra_chars
@@ -95,6 +96,21 @@ class GameScreen(Screen):
                 with Horizontal(id="typing-container"):
                     yield Static(self.target_text, id="typing-area")
 
+            # HISTORY PANEL
+            with Horizontal(id="history-panel"):
+                yield Static(
+                    Text("Best WPM:", style="#753FEB"),
+                    id="best-wpm"
+                )
+                yield Static(
+                    Text("Accuracy:", style="#753FEB"),
+                    id="accuracy"
+                )
+                yield Static(
+                    Text("Attempts:", style="#753FEB"),
+                    id="attempts"
+                )
+
             # BOTTOM CONTROLS
             with Horizontal(id="bottom-controls"):
                 yield Static(
@@ -119,6 +135,7 @@ class GameScreen(Screen):
 
         self.selected_mode = "timer"
         self.selected_word_count = 30
+        self.history = HistoryStore.load(HISTORY_PATH)
 
         # Temporary settings being edited in the configuration panel
         self.config_difficulty = self.selected_difficulty
@@ -173,6 +190,7 @@ class GameScreen(Screen):
             "timer-option3", "timer-option4"],
             "timer-option2"
         )
+        self.update_history_panel()
 
     def delete_last_char(self):
         if self.typed_text.endswith(" "):
@@ -246,13 +264,7 @@ class GameScreen(Screen):
 
                 self.countdown_interval.stop()
 
-                self.app.push_screen(
-                    ResultsScreen(
-                        self.char_all_results,
-                        self.extra_char_all_count,
-                        self.timer.elapsed_time
-                    )
-                )
+                self.show_results(self.timer.elapsed_time)
                 return
 
         self.next_set_words()
@@ -437,6 +449,47 @@ class GameScreen(Screen):
 
         self.query_one("#selected-time", Static).update(display_text)
         self.format_target_text()
+        self.update_history_panel()
+
+    def update_history_panel(self):
+        best = self.history.best_for(
+            self.selected_mode,
+            self.selected_difficulty,
+            self.selected_time,
+            self.selected_word_count,
+        )
+        self.query_one("#best-wpm", Static).update(
+            Text("Best WPM:", style="#753FEB")
+            + Text(f" {best['wpm']}", style="#FFFFFF")
+        )
+        self.query_one("#accuracy", Static).update(
+            Text("Accuracy:", style="#753FEB")
+            + Text(f" {int(best['accuracy'] + 0.5)}%", style="#FFFFFF")
+        )
+        self.query_one("#attempts", Static).update(
+            Text("Attempts:", style="#753FEB")
+            + Text(f" {self.history.attempts}", style="#FFFFFF")
+        )
+
+    def show_results(self, duration):
+        results = ResultsScreen(
+            self.char_all_results,
+            self.extra_char_all_count,
+            duration,
+        )
+        try:
+            self.history.record_result(
+                self.selected_mode,
+                self.selected_difficulty,
+                self.selected_time,
+                self.selected_word_count,
+                results.wpm,
+                results.accuracy,
+            )
+        except OSError as error:
+            self.notify(f"Unable to save history: {error}", severity="error")
+        self.update_history_panel()
+        self.app.push_screen(results)
 
     def update_selected_option(self, option_ids, selected_id):
         for option_id in option_ids:
@@ -769,10 +822,4 @@ class GameScreen(Screen):
                 self.char_results = []
                 self.extra_char_count = 0
 
-                self.app.push_screen(
-                    ResultsScreen(
-                        self.char_all_results,
-                        self.extra_char_all_count,
-                        self.timer.duration
-                    )
-                )
+                self.show_results(self.timer.duration)
