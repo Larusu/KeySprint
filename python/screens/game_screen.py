@@ -14,6 +14,10 @@ from screens.results_screen import ResultsScreen
 
 from rich.text import Text
 
+TIMER_PRESETS = (15, 30, 60, 120)
+WORD_PRESETS = (10, 25, 50, 75)
+
+
 class GameScreen(Screen):
     CSS_PATH = "../styles/app.tcss"
     AUTO_FOCUS = ""
@@ -54,10 +58,10 @@ class GameScreen(Screen):
                 yield Static("WORD COUNT", classes="config-label")
         
                 with Horizontal(id="word-options", classes="config-options"):
-                    yield Static("15", id="word-option1", classes="config-option")
-                    yield Static("30", id="word-option2", classes="config-option")
-                    yield Static("60", id="word-option3", classes="config-option")
-                    yield Static("120", id="word-option4", classes="config-option")
+                    yield Static("10", id="word-option1", classes="config-option")
+                    yield Static("25", id="word-option2", classes="config-option")
+                    yield Static("50", id="word-option3", classes="config-option")
+                    yield Static("75", id="word-option4", classes="config-option")
                     yield Static("CUSTOM", id="word-option-custom", classes="config-option")
         
                 yield Input(
@@ -134,14 +138,14 @@ class GameScreen(Screen):
         self.timer = Timer(self.selected_time)
 
         self.selected_mode = "timer"
-        self.selected_word_count = 30
+        self.selected_word_count = 25
         self.history = HistoryStore.load(HISTORY_PATH)
 
         # Temporary settings being edited in the configuration panel
         self.config_difficulty = self.selected_difficulty
         self.config_mode = self.selected_mode
         self.config_time = self.selected_time
-        self.config_word_count = 30
+        self.config_word_count = 25
         self.config_custom_words = False
 
         self.char_results = []
@@ -162,9 +166,6 @@ class GameScreen(Screen):
         self.config_open = False
 
     def on_mount(self):
-        # Hide Custom initially because Timer is the default mode
-        self.query_one("#timer-option-custom", Static).styles.display = "none"
-
         # Highlight the default difficulty
         difficulty_options = {
             "1k": "difficulty-option1",
@@ -183,13 +184,7 @@ class GameScreen(Screen):
             ["timer-mode", "words-mode"],
             "timer-mode"
         )
-
-        # Highlight the default timer
-        self.update_selected_option(
-            ["timer-option1", "timer-option2",
-            "timer-option3", "timer-option4"],
-            "timer-option2"
-        )
+        self.update_top_limit_options()
         self.update_history_panel()
 
     def delete_last_char(self):
@@ -471,6 +466,32 @@ class GameScreen(Screen):
             + Text(f" {self.history.attempts}", style="#FFFFFF")
         )
 
+    def update_top_limit_options(self):
+        if self.selected_mode == "timer":
+            presets = TIMER_PRESETS
+            selected_value = self.selected_time
+            self.query_one("#timer-option-custom", Static).styles.display = "none"
+        else:
+            presets = WORD_PRESETS
+            selected_value = self.selected_word_count
+            self.query_one("#timer-option-custom", Static).styles.display = "block"
+
+        option_ids = []
+        selected_id = None
+        for index, value in enumerate(presets, start=1):
+            option_id = f"timer-option{index}"
+            self.query_one(f"#{option_id}", Static).update(str(value))
+            option_ids.append(option_id)
+            if value == selected_value:
+                selected_id = option_id
+
+        if self.selected_mode == "words" and self.config_custom_words:
+            selected_id = "timer-option-custom"
+        self.update_selected_option(
+            option_ids + ["timer-option-custom"],
+            selected_id,
+        )
+
     def show_results(self, duration):
         results = ResultsScreen(
             self.char_all_results,
@@ -524,6 +545,17 @@ class GameScreen(Screen):
         self.selected_mode = self.config_mode
         self.selected_time = self.config_time
 
+        top_difficulty_options = {
+            "1k": "difficulty-option1",
+            "5k": "difficulty-option2",
+            "10k": "difficulty-option3",
+            "25k": "difficulty-option4",
+        }
+        self.update_selected_option(
+            list(top_difficulty_options.values()),
+            top_difficulty_options[self.selected_difficulty],
+        )
+        self.update_top_limit_options()
         self.reset_game()
         self.toggle_config()
         
@@ -536,6 +568,7 @@ class GameScreen(Screen):
             self.selected_mode = "words"
             self.config_mode = "words"
             self.config_custom_words = True
+            self.update_top_limit_options()
 
             # Highlight Words
             self.update_selected_option(
@@ -641,10 +674,39 @@ class GameScreen(Screen):
                 timer_options.styles.display = "block"
                 word_options.styles.display = "none"
                 custom_input.styles.display = "none"
+                selected_id = next(
+                    (
+                        f"config-timer{index}"
+                        for index, value in enumerate(TIMER_PRESETS, start=1)
+                        if value == self.config_time
+                    ),
+                    None,
+                )
+                self.update_selected_option(
+                    [f"config-timer{index}" for index in range(1, 5)],
+                    selected_id,
+                )
             else:
                 timer_options.styles.display = "none"
                 word_options.styles.display = "block"
-                custom_input.styles.display = "none"
+                custom_input.styles.display = (
+                    "block" if self.config_custom_words else "none"
+                )
+                selected_id = next(
+                    (
+                        f"word-option{index}"
+                        for index, value in enumerate(WORD_PRESETS, start=1)
+                        if value == self.config_word_count
+                    ),
+                    None,
+                )
+                if self.config_custom_words:
+                    selected_id = "word-option-custom"
+                self.update_selected_option(
+                    [f"word-option{index}" for index in range(1, 5)]
+                    + ["word-option-custom"],
+                    selected_id,
+                )
 
             return
 
@@ -661,45 +723,7 @@ class GameScreen(Screen):
                 clicked_id
             )
 
-            custom_option = self.query_one("#timer-option-custom", Static)
-
-            top_timer_options = {
-                "timer-option1": 15,
-                "timer-option2": 30,
-                "timer-option3": 60,
-                "timer-option4": 120
-            }
-
-            if self.selected_mode == "words":
-                custom_option.styles.display = "block"
-                selected_value = self.selected_word_count
-            else:
-                custom_option.styles.display = "none"
-                selected_value = self.selected_time
-
-            # Find the selected number for the active mode
-            selected_option_id = next(
-                (
-                    option_id
-                    for option_id, value in top_timer_options.items()
-                    if value == selected_value
-                ),
-                None
-            )
-
-            # Update number selection, including Custom
-            self.update_selected_option(
-                list(top_timer_options.keys()) + ["timer-option-custom"],
-                selected_option_id
-            )
-
-            # If a custom word count is active, highlight Custom instead
-            if self.selected_mode == "words" and self.config_custom_words:
-                self.update_selected_option(
-                    list(top_timer_options.keys()) + ["timer-option-custom"],
-                    "timer-option-custom"
-                )
-
+            self.update_top_limit_options()
             self.reset_game()
             return
 
@@ -721,10 +745,10 @@ class GameScreen(Screen):
 
         # Configuration: preset word count
         config_word_options = {
-            "word-option1": 15,
-            "word-option2": 30,
-            "word-option3": 60,
-            "word-option4": 120
+            "word-option1": 10,
+            "word-option2": 25,
+            "word-option3": 50,
+            "word-option4": 75
         }
 
         if clicked_id in config_word_options:
@@ -782,11 +806,10 @@ class GameScreen(Screen):
             return
 
         # Top timer / word count options
+        presets = TIMER_PRESETS if self.selected_mode == "timer" else WORD_PRESETS
         top_timer_options = {
-            "timer-option1": 15,
-            "timer-option2": 30,
-            "timer-option3": 60,
-            "timer-option4": 120
+            f"timer-option{index}": value
+            for index, value in enumerate(presets, start=1)
         }
 
         if clicked_id in top_timer_options:
@@ -796,11 +819,9 @@ class GameScreen(Screen):
                 self.selected_time = selected_value
             else:
                 self.selected_word_count = selected_value
+                self.config_custom_words = False
 
-            self.update_selected_option(
-                list(top_timer_options.keys()), clicked_id
-            )
-
+            self.update_top_limit_options()
             self.reset_game()
             return
 
