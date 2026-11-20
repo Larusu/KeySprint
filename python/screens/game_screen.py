@@ -333,7 +333,12 @@ class GameScreen(Screen):
                         if self.char_results[result_index]:
                             formatted_text.append(character, style="white")
                         else:
-                            formatted_text.append(character, style="red")
+                            displayed_character = (
+                                target_word[char_index]
+                                if char_index < len(target_word)
+                                else character
+                            )
+                            formatted_text.append(displayed_character, style="red")
 
                         result_index += 1
 
